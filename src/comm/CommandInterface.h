@@ -20,18 +20,18 @@ class CommandInterface {
   void sendResponseError(uint32_t id, ErrorCode error);
 
  private:
-  static constexpr uint8_t kQueueCapacity = 8;
-  static constexpr uint16_t kMaxLineLength = 160;
+  static constexpr uint8_t  kQueueCapacity = 8;
+  static constexpr uint16_t kMaxLineLength  = 160;
 
   Command parseLine(String line) const;
-  bool enqueue(const Command &command);
-  bool parseKeyValue(const String &fragment, String &key, String &value) const;
+  bool    enqueue(const Command &cmd);
+  bool    parseKeyValue(const String &fragment, String &key, String &value) const;
 
-  Stream *serial_ = nullptr;
-  String inputBuffer_;
+  Stream *serial_      = nullptr;
+  String  inputBuffer_;
   Command queue_[kQueueCapacity];
-  uint8_t head_ = 0;
-  uint8_t tail_ = 0;
+  uint8_t head_  = 0;
+  uint8_t tail_  = 0;
   uint8_t count_ = 0;
 };
 

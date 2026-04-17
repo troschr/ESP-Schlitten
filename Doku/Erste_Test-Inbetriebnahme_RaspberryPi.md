@@ -1,24 +1,24 @@
-# Erste Test-Inbetriebnahme mit Raspberry Pi
+# Erste Test-Inbetriebnahme am Laptop
 
 ## Zweck
 
 Der aktuelle ESP-Stand ist nur ein einfacher Test fuer:
 
-- USB-Serial zum Raspberry Pi
-- 2x VL53L1X ueber I2C
-- Taster an GPIOs mit `INPUT_PULLUP`
+- USB-Serial zum Laptop
+- 1x VL53L1X ueber I2C
+- 1x Taster an GPIO mit `INPUT_PULLUP`
 
 Keine Motoren, keine Ablaufsteuerung.
 
 ## Verdrahtung
 
-### Raspberry Pi <-> ESP32
+### Laptop <-> ESP32
 
 - Verbindung per USB
 - Baudrate: `115200`
-- typischer Port am Pi:
-  - `/dev/ttyUSB0`
-  - oder `/dev/ttyACM0`
+- typische Ports unter macOS:
+  - `/dev/cu.usbserial-*`
+  - `/dev/cu.usbmodem*`
 
 ### I2C
 
@@ -27,30 +27,24 @@ Keine Motoren, keine Ablaufsteuerung.
 
 ### VL53L1X
 
-Beide Sensoren liegen auf demselben I2C-Bus.
-Jeder Sensor braucht einen eigenen `XSHUT`-Pin.
+Aktuell wird nur ein VL53L1X benutzt.
+Der `XSHUT`-Pin ist trotzdem angeschlossen.
 
 - `tof_1`
   - `XSHUT = GPIO16`
   - Adresse nach Init: `0x30`
-- `tof_2`
-  - `XSHUT = GPIO17`
-  - Adresse nach Init: `0x31`
 
-Je Sensor:
+Verdrahtung:
 
 - `VIN -> 3V3`
 - `GND -> GND`
 - `SDA -> GPIO21`
 - `SCL -> GPIO22`
-- `XSHUT -> jeweiliger GPIO`
+- `XSHUT -> GPIO16`
 
 ### Taster
 
 - `btn_1 = GPIO32`
-- `btn_2 = GPIO33`
-- `btn_3 = GPIO25`
-- `btn_4 = GPIO26`
 
 Je Taster:
 
@@ -63,7 +57,7 @@ Logik:
 - gedrueckt = `LOW`
 - im Status: `1 = gedrueckt`
 
-## Was der Raspberry Pi senden kann
+## Was das Terminal senden kann
 
 Alle Befehle als Textzeile mit Newline:
 
@@ -81,7 +75,6 @@ Alle Befehle als Textzeile mit Newline:
 
 ```text
 SENSOR_INIT;name=tof_1;ok=1;addr=0x30
-SENSOR_INIT;name=tof_2;ok=1;addr=0x31
 READY;fw=esp32_component_test
 INFO;commands=PING,STATUS,STREAM ON,STREAM OFF,REINIT,I2C_SCAN,HELP
 STATUS;reason=boot;...
@@ -96,13 +89,13 @@ PONG;uptime_ms=12345
 ### Auf `I2C_SCAN`
 
 ```text
-I2C_SCAN;found=0x30;found=0x31
+I2C_SCAN;found=0x30
 ```
 
 ### Zyklischer Status
 
 ```text
-STATUS;reason=stream;uptime_ms=...;tof_1_ok=1;tof_1_mm=...;tof_1_timeout=0;tof_2_ok=1;tof_2_mm=...;tof_2_timeout=0;btn_1=0;btn_2=0;btn_3=1;btn_4=0
+STATUS;reason=stream;uptime_ms=...;tof_1_ok=1;tof_1_mm=...;tof_1_timeout=0;btn_1=0
 ```
 
 Bedeutung:
@@ -110,7 +103,7 @@ Bedeutung:
 - `tof_x_ok=1` Sensor initialisiert
 - `tof_x_mm` Distanz in mm
 - `tof_x_timeout=1` Timeout beim Lesen
-- `btn_x=1` Taster gedrueckt
+- `btn_1=1` Taster gedrueckt
 
 ### Taster-Events
 
@@ -128,10 +121,10 @@ EVENT;type=tof_timeout;name=tof_1;active=0
 
 ## Kurzer Testablauf
 
-### 1. Port am Pi finden
+### 1. Port am Laptop finden
 
 ```bash
-ls /dev/ttyUSB* /dev/ttyACM*
+ls /dev/cu.usbserial-* /dev/cu.usbmodem*
 ```
 
 ### 2. Verbinden
@@ -139,12 +132,18 @@ ls /dev/ttyUSB* /dev/ttyACM*
 Zum Beispiel:
 
 ```bash
-screen /dev/ttyUSB0 115200
+screen /dev/cu.usbmodemXXXX 115200
+```
+
+Alternativ mit PlatformIO:
+
+```bash
+/Users/christiantroschel/.platformio/penv/bin/pio device monitor -b 115200
 ```
 
 ### 3. Kommunikation pruefen
 
-Senden:
+Im Terminal senden:
 
 ```text
 PING
@@ -158,7 +157,7 @@ PONG;uptime_ms=...
 
 ### 4. I2C pruefen
 
-Senden:
+Im Terminal senden:
 
 ```text
 I2C_SCAN
@@ -167,12 +166,12 @@ I2C_SCAN
 Erwartet:
 
 ```text
-I2C_SCAN;found=0x30;found=0x31
+I2C_SCAN;found=0x30
 ```
 
 ### 5. Sensoren pruefen
 
-Senden:
+Im Terminal senden:
 
 ```text
 STREAM ON
@@ -180,8 +179,8 @@ STREAM ON
 
 Dann pruefen:
 
-- aendern sich `tof_1_mm` und `tof_2_mm`?
-- bleiben `tof_x_timeout=0`?
+- aendert sich `tof_1_mm`?
+- bleibt `tof_1_timeout=0`?
 
 ### 6. Taster pruefen
 
@@ -202,6 +201,6 @@ Dann pruefen:
 Der erste Test ist erfolgreich, wenn:
 
 - `PING` beantwortet wird
-- `I2C_SCAN` beide Sensoren findet
-- beide VL53L1X Werte liefern
+- `I2C_SCAN` den Sensor findet
+- der VL53L1X Werte liefert
 - alle Taster sauber schalten

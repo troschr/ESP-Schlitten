@@ -2,56 +2,58 @@
 
 namespace esp_schlitten {
 
-void StatusReporter::begin(CommandInterface &commandInterface) {
-  commandInterface_ = &commandInterface;
+void StatusReporter::begin(CommandInterface &comm) {
+  comm_ = &comm;
 }
 
 void StatusReporter::sendState(AppState state, const MotionSnapshot &motion) {
-  if (commandInterface_ == nullptr) {
-    return;
-  }
-
-  commandInterface_->sendLine(String("EVT;0;STATE;") + String(toString(state)) + ";ref=" +
-                              String(motion.referenced ? 1 : 0) + ";pos=" +
-                              String(motion.currentPositionSteps));
+  if (!comm_) return;
+  comm_->sendLine(
+    String("EVT;0;STATE;") + toString(state) +
+    ";ref=" + (motion.referenced ? "1" : "0") +
+    posFields(motion));
 }
 
-void StatusReporter::sendStatus(const StatusSnapshot &snapshot) {
-  if (commandInterface_ == nullptr) {
-    return;
-  }
+void StatusReporter::sendStatus(const StatusSnapshot &s) {
+  if (!comm_) return;
+  comm_->sendLine(
+    String("EVT;0;STATUS;state=")   + toString(s.state) +
+    ";error="                        + toString(s.error) +
+    ";ref="                          + (s.motion.referenced ? "1" : "0") +
+    ";x="                            + s.motion.current.x_mm +
+    ";z="                            + s.motion.current.z_mm +
+    ";target_x="                     + s.motion.target.x_mm +
+    ";target_z="                     + s.motion.target.z_mm +
+    ";busy="                         + (s.motion.busy ? "1" : "0") +
+    ";gripper="                      + (s.sensors.gripperDetected ? "1" : "0") +
+    ";obstacle_ok="                  + (s.sensors.obstacleOk ? "1" : "0") +
+    ";door_dist_mm="                 + s.sensors.doorDistanceMm);
+}
 
-  commandInterface_->sendLine(
-      String("EVT;0;STATUS;state=") + String(toString(snapshot.state)) + ";error=" +
-      String(toString(snapshot.error)) + ";ref=" + String(snapshot.motion.referenced ? 1 : 0) +
-      ";pos=" + String(snapshot.motion.currentPositionSteps) + ";target=" +
-      String(snapshot.motion.targetPositionSteps) + ";busy=" +
-      String(snapshot.motion.busy ? 1 : 0) + ";gripper=" +
-      String(snapshot.sensors.gripperDetected ? 1 : 0) + ";home=" +
-      String(snapshot.sensors.homeDetected ? 1 : 0) + ";tof_ok=" +
-      String(snapshot.sensors.tofHealthy ? 1 : 0) + ";front_mm=" +
-      String(snapshot.sensors.frontDistanceMm) + ";rear_mm=" +
-      String(snapshot.sensors.rearDistanceMm));
+void StatusReporter::sendOk(uint32_t id, const char *eventName, const MotionSnapshot &motion) {
+  if (!comm_) return;
+  comm_->sendLine(
+    String("EVT;") + id + ";OK;" + eventName +
+    posFields(motion));
 }
 
 void StatusReporter::sendError(ErrorCode error, const MotionSnapshot &motion) {
-  if (commandInterface_ == nullptr) {
-    return;
-  }
-
-  commandInterface_->sendLine(String("EVT;0;ERR;") + String(toString(error)) + ";pos=" +
-                              String(motion.currentPositionSteps) + ";target=" +
-                              String(motion.targetPositionSteps));
+  if (!comm_) return;
+  comm_->sendLine(
+    String("EVT;0;ERR;") + toString(error) +
+    posFields(motion));
 }
 
-void StatusReporter::sendOk(uint32_t id, const String &eventName, const MotionSnapshot &motion) {
-  if (commandInterface_ == nullptr) {
-    return;
-  }
+void StatusReporter::sendHeartbeat(AppState state, const MotionSnapshot &motion) {
+  if (!comm_) return;
+  comm_->sendLine(
+    String("EVT;0;HEARTBEAT;uptime_ms=") + millis() +
+    ";state="                             + toString(state) +
+    posFields(motion));
+}
 
-  commandInterface_->sendLine(String("EVT;") + String(id) + ";OK;" + eventName + ";pos=" +
-                              String(motion.currentPositionSteps) + ";target=" +
-                              String(motion.targetPositionSteps));
+String StatusReporter::posFields(const MotionSnapshot &motion) const {
+  return String(";x=") + motion.current.x_mm + ";z=" + motion.current.z_mm;
 }
 
 }  // namespace esp_schlitten

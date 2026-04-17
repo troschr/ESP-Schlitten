@@ -4,13 +4,8 @@ namespace esp_schlitten {
 
 void AppController::begin() {
   Serial.begin(config::Serial::kBaudRate);
-  commandInterface_.begin(Serial);
-  statusReporter_.begin(commandInterface_);
-
-  sensorManager_.begin();
-  servoController_.begin();
-  motionController_.begin();
-  safetyManager_.begin(millis());
+  comm_.begin(Serial);
+  reporter_.begin(comm_);
 
   error_ = ErrorCode::None;
   setState(AppState::NotReferenced);
@@ -19,185 +14,229 @@ void AppController::begin() {
 
 void AppController::update() {
   const uint32_t nowMs = millis();
-  const uint32_t nowMicros = micros();
 
-  commandInterface_.poll();
-  sensorManager_.update(nowMs);
-  processCommands(nowMs);
+  comm_.poll();
+  processCommands();
 
-  const MotionController::UpdateResult motionResult =
-      motionController_.update(nowMs, nowMicros, sensorManager_.snapshot());
-
-  if (motionResult.fault != ErrorCode::None) {
-    enterError(motionResult.fault);
-    return;
-  }
-
-  if (motionResult.homeCompleted) {
-    error_ = ErrorCode::None;
-    setState(AppState::Ready);
-    statusReporter_.sendOk(activeCommandId_, "HOME_DONE", motionController_.snapshot());
-    activeCommandId_ = 0;
-  } else if (motionResult.moveCompleted) {
-    error_ = ErrorCode::None;
-    setState(AppState::Ready);
-    statusReporter_.sendOk(activeCommandId_, "MOVE_DONE", motionController_.snapshot());
-    activeCommandId_ = 0;
-  }
-
-  const ErrorCode safetyError =
-      safetyManager_.update(nowMs, sensorManager_.snapshot(), motionController_.snapshot());
-  if (safetyError != ErrorCode::None) {
-    enterError(safetyError);
-  }
-}
-
-void AppController::processCommands(uint32_t nowMs) {
-  while (commandInterface_.hasPendingCommand()) {
-    const Command command = commandInterface_.popCommand();
-    if (command.valid) {
-      safetyManager_.notePiContact(nowMs);
-    }
-    processCommand(command, nowMs);
-  }
-}
-
-void AppController::processCommand(const Command &command, uint32_t nowMs) {
-  if (!command.valid) {
-    commandInterface_.sendResponseError(command.id, command.parseError);
-    return;
-  }
-
-  if (command.type == CommandType::Status) {
-    commandInterface_.sendAck(command.id);
+  if (streamEnabled_ && (nowMs - lastStreamAtMs_) >= config::Timing::kStreamIntervalMs) {
+    lastStreamAtMs_ = nowMs;
     publishStatus();
+  }
+
+  if ((nowMs - lastHeartbeatAtMs_) >= config::Timing::kHeartbeatIntervalMs) {
+    lastHeartbeatAtMs_ = nowMs;
+    reporter_.sendHeartbeat(state_, motionSnapshot());
+  }
+}
+
+// ---------------------------------------------------------------------------
+
+void AppController::processCommands() {
+  while (comm_.hasPendingCommand()) {
+    processCommand(comm_.popCommand());
+  }
+}
+
+void AppController::processCommand(const Command &cmd) {
+  if (!cmd.valid) {
+    comm_.sendResponseError(cmd.id, cmd.parseError);
     return;
   }
 
-  if (command.type == CommandType::Ping) {
-    commandInterface_.sendAck(command.id);
-    statusReporter_.sendOk(command.id, "PONG", motionController_.snapshot());
-    return;
-  }
+  switch (cmd.type) {
 
-  if (command.type == CommandType::Stop) {
-    motionController_.stopImmediate();
-    commandInterface_.sendAck(command.id);
-    if (state_ != AppState::Error) {
+    case CommandType::Ping:
+      comm_.sendAck(cmd.id);
+      reporter_.sendOk(cmd.id, "PONG", motionSnapshot());
+      return;
+
+    case CommandType::Status:
+      comm_.sendAck(cmd.id);
+      publishStatus();
+      return;
+
+    case CommandType::StreamOn:
+      streamEnabled_  = true;
+      lastStreamAtMs_ = millis();
+      comm_.sendAck(cmd.id);
+      reporter_.sendOk(cmd.id, "STREAM_ON", motionSnapshot());
+      return;
+
+    case CommandType::StreamOff:
+      streamEnabled_ = false;
+      comm_.sendAck(cmd.id);
+      reporter_.sendOk(cmd.id, "STREAM_OFF", motionSnapshot());
+      return;
+
+    case CommandType::Stop: {
+      // TODO: Motoren stoppen sobald MotionController vorhanden
+      comm_.sendAck(cmd.id);
+      if (state_ != AppState::Error) {
+        error_ = ErrorCode::None;
+        setState(AppState::Stopped);
+        reporter_.sendOk(cmd.id, "STOPPED", motionSnapshot());
+      }
+      return;
+    }
+
+    case CommandType::ResetError:
+      if (state_ != AppState::Error) {
+        comm_.sendResponseError(cmd.id, ErrorCode::InvalidState);
+        return;
+      }
       error_ = ErrorCode::None;
-      setState(AppState::Stopped);
-      statusReporter_.sendOk(command.id, "STOPPED", motionController_.snapshot());
-    }
-    activeCommandId_ = 0;
-    return;
-  }
-
-  if (command.type == CommandType::ResetError) {
-    if (state_ != AppState::Error) {
-      commandInterface_.sendResponseError(command.id, ErrorCode::InvalidState);
+      comm_.sendAck(cmd.id);
+      setState(AppState::NotReferenced);
+      reporter_.sendOk(cmd.id, "ERROR_RESET", motionSnapshot());
       return;
-    }
 
-    motionController_.clearReference();
-    error_ = ErrorCode::None;
-    commandInterface_.sendAck(command.id);
-    setState(AppState::NotReferenced);
-    statusReporter_.sendOk(command.id, "ERROR_RESET", motionController_.snapshot());
-    return;
-  }
-
-  if (command.type == CommandType::SetServo) {
-    if (state_ == AppState::Error) {
-      commandInterface_.sendResponseError(command.id, ErrorCode::InvalidState);
+    case CommandType::Home:
+      handleHome(cmd);
       return;
-    }
 
-    if (motionController_.isBusy()) {
-      commandInterface_.sendResponseError(command.id, ErrorCode::Busy);
+    case CommandType::MoveTo:
+      handleMoveTo(cmd);
       return;
-    }
 
-    if (!servoController_.setPosition(command.holderPosition)) {
-      commandInterface_.sendResponseError(command.id, ErrorCode::InvalidCommand);
+    case CommandType::SetServo:
+      handleSetServo(cmd);
       return;
-    }
 
-    commandInterface_.sendAck(command.id);
-    statusReporter_.sendOk(command.id, String("SERVO_") + String(toString(command.holderPosition)),
-                           motionController_.snapshot());
-    return;
+    case CommandType::SetDoorArm:
+      handleSetDoorArm(cmd);
+      return;
+
+    default:
+      comm_.sendResponseError(cmd.id, ErrorCode::InvalidCommand);
   }
+}
 
-  if (motionController_.isBusy()) {
-    commandInterface_.sendResponseError(command.id, ErrorCode::Busy);
-    return;
-  }
+// ---------------------------------------------------------------------------
 
+void AppController::handleHome(const Command &cmd) {
   if (state_ == AppState::Error) {
-    commandInterface_.sendResponseError(command.id, ErrorCode::InvalidState);
+    comm_.sendResponseError(cmd.id, ErrorCode::InvalidState);
+    return;
+  }
+  if (state_ == AppState::BusyHoming || state_ == AppState::BusyMoving) {
+    comm_.sendResponseError(cmd.id, ErrorCode::Busy);
     return;
   }
 
-  if (command.type == CommandType::Home) {
-    if (!motionController_.startHoming(nowMs)) {
-      commandInterface_.sendResponseError(command.id, ErrorCode::Busy);
-      return;
-    }
+  comm_.sendAck(cmd.id);
+  setState(AppState::BusyHoming);
 
-    activeCommandId_ = command.id;
-    commandInterface_.sendAck(command.id);
-    error_ = ErrorCode::None;
-    setState(AppState::BusyHoming);
-    return;
-  }
-
-  if (command.type == CommandType::MoveTo) {
-    if (!motionController_.isReferenced()) {
-      commandInterface_.sendResponseError(command.id, ErrorCode::NotReferenced);
-      return;
-    }
-
-    if (!motionController_.startMoveTo(command.positionSteps, command.speedStepsPerSecond,
-                                       nowMs)) {
-      commandInterface_.sendResponseError(command.id, ErrorCode::Busy);
-      return;
-    }
-
-    activeCommandId_ = command.id;
-    commandInterface_.sendAck(command.id);
-    error_ = ErrorCode::None;
-    setState(AppState::BusyMoving);
-    return;
-  }
-
-  commandInterface_.sendResponseError(command.id, ErrorCode::InvalidCommand);
+  // TODO: MotionController.startHoming() aufrufen
+  // Stub: sofortige Simulation bis Hardware vorhanden
+  current_ = Position{};
+  target_  = Position{};
+  error_   = ErrorCode::None;
+  setState(AppState::Ready);
+  reporter_.sendOk(cmd.id, "HOME_DONE", motionSnapshot());
 }
 
-void AppController::publishStatus() {
-  StatusSnapshot snapshot;
-  snapshot.state = state_;
-  snapshot.error = error_;
-  snapshot.motion = motionController_.snapshot();
-  snapshot.sensors = sensorManager_.snapshot();
-  statusReporter_.sendStatus(snapshot);
-}
-
-void AppController::setState(AppState nextState) {
-  if (state_ == nextState) {
+void AppController::handleMoveTo(const Command &cmd) {
+  if (state_ == AppState::Error) {
+    comm_.sendResponseError(cmd.id, ErrorCode::InvalidState);
+    return;
+  }
+  if (state_ != AppState::Ready && state_ != AppState::Stopped) {
+    comm_.sendResponseError(cmd.id, ErrorCode::Busy);
+    return;
+  }
+  if (state_ == AppState::NotReferenced) {
+    comm_.sendResponseError(cmd.id, ErrorCode::NotReferenced);
     return;
   }
 
-  state_ = nextState;
-  statusReporter_.sendState(state_, motionController_.snapshot());
+  target_ = cmd.target;
+  comm_.sendAck(cmd.id);
+  setState(AppState::BusyMoving);
+
+  // TODO: MotionController.startMoveTo() aufrufen
+  // Stub: sofortige Simulation bis Hardware vorhanden
+  current_ = target_;
+  error_   = ErrorCode::None;
+  setState(AppState::Ready);
+  reporter_.sendOk(cmd.id, "MOVE_DONE", motionSnapshot());
+}
+
+void AppController::handleSetServo(const Command &cmd) {
+  if (state_ == AppState::Error) {
+    comm_.sendResponseError(cmd.id, ErrorCode::InvalidState);
+    return;
+  }
+  if (state_ == AppState::BusyHoming || state_ == AppState::BusyMoving) {
+    comm_.sendResponseError(cmd.id, ErrorCode::Busy);
+    return;
+  }
+
+  comm_.sendAck(cmd.id);
+
+  // TODO: ServoController aufrufen
+  String eventName = String("SERVO_") + toString(cmd.holderPosition);
+  reporter_.sendOk(cmd.id, eventName.c_str(), motionSnapshot());
+}
+
+void AppController::handleSetDoorArm(const Command &cmd) {
+  if (state_ == AppState::Error) {
+    comm_.sendResponseError(cmd.id, ErrorCode::InvalidState);
+    return;
+  }
+  if (state_ == AppState::BusyHoming || state_ == AppState::BusyMoving) {
+    comm_.sendResponseError(cmd.id, ErrorCode::Busy);
+    return;
+  }
+
+  comm_.sendAck(cmd.id);
+
+  // TODO: DoorArmController aufrufen (Stepper oder Servo – noch offen)
+  String eventName = String("DOOR_ARM_") + toString(cmd.doorArmPosition);
+  reporter_.sendOk(cmd.id, eventName.c_str(), motionSnapshot());
+}
+
+// ---------------------------------------------------------------------------
+
+void AppController::setState(AppState next) {
+  if (state_ == next) return;
+  state_ = next;
+  reporter_.sendState(state_, motionSnapshot());
 }
 
 void AppController::enterError(ErrorCode error) {
-  motionController_.stopImmediate();
+  // TODO: Motoren stoppen sobald MotionController vorhanden
   error_ = error;
-  activeCommandId_ = 0;
   setState(AppState::Error);
-  statusReporter_.sendError(error, motionController_.snapshot());
+  reporter_.sendError(error, motionSnapshot());
   publishStatus();
+}
+
+void AppController::publishStatus() {
+  StatusSnapshot s;
+  s.state   = state_;
+  s.error   = error_;
+  s.motion  = motionSnapshot();
+  s.sensors = sensorSnapshot();
+  reporter_.sendStatus(s);
+}
+
+MotionSnapshot AppController::motionSnapshot() const {
+  MotionSnapshot m;
+  m.current    = current_;
+  m.target     = target_;
+  m.busy       = (state_ == AppState::BusyHoming || state_ == AppState::BusyMoving);
+  m.referenced = (state_ == AppState::Ready   ||
+                  state_ == AppState::BusyMoving ||
+                  state_ == AppState::Stopped);
+  return m;
+}
+
+SensorSnapshot AppController::sensorSnapshot() const {
+  // TODO: echte Sensor-Hardware auslesen
+  SensorSnapshot s;
+  s.obstacleOk    = true;
+  s.doorDistanceMm = 0;
+  return s;
 }
 
 }  // namespace esp_schlitten

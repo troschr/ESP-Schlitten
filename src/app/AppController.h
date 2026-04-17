@@ -5,10 +5,6 @@
 #include "comm/CommandInterface.h"
 #include "config/Config.h"
 #include "core/Types.h"
-#include "io/SensorManager.h"
-#include "io/ServoController.h"
-#include "motion/MotionController.h"
-#include "safety/SafetyManager.h"
 #include "status/StatusReporter.h"
 
 namespace esp_schlitten {
@@ -19,22 +15,30 @@ class AppController {
   void update();
 
  private:
-  void processCommands(uint32_t nowMs);
-  void processCommand(const Command &command, uint32_t nowMs);
-  void publishStatus();
-  void setState(AppState nextState);
+  void processCommands();
+  void processCommand(const Command &cmd);
+  void handleMoveTo(const Command &cmd);
+  void handleHome(const Command &cmd);
+  void handleSetServo(const Command &cmd);
+  void handleSetDoorArm(const Command &cmd);
+
+  void setState(AppState next);
   void enterError(ErrorCode error);
+  void publishStatus();
+  MotionSnapshot motionSnapshot() const;
+  SensorSnapshot sensorSnapshot() const;
 
-  CommandInterface commandInterface_;
-  SensorManager sensorManager_;
-  ServoController servoController_;
-  MotionController motionController_;
-  SafetyManager safetyManager_;
-  StatusReporter statusReporter_;
+  CommandInterface comm_;
+  StatusReporter   reporter_;
 
-  AppState state_ = AppState::Booting;
-  ErrorCode error_ = ErrorCode::None;
-  uint32_t activeCommandId_ = 0;
+  AppState  state_    = AppState::NotReferenced;
+  ErrorCode error_    = ErrorCode::None;
+  Position  current_;
+  Position  target_;
+
+  bool     streamEnabled_   = false;
+  uint32_t lastStreamAtMs_  = 0;
+  uint32_t lastHeartbeatAtMs_ = 0;
 };
 
 }  // namespace esp_schlitten
