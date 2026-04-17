@@ -137,9 +137,9 @@ Command CommandInterface::parseLine(String line) const {
     return cmd;
   }
 
-  // --- SET_SERVO;position=<OPEN|CLOSED|SERVICE> ---
-  if (verb == "SET_SERVO") {
-    cmd.type = CommandType::SetServo;
+  // --- SET_CLAMP;position=<OPEN|CLOSED|SERVICE> ---
+  if (verb == "SET_CLAMP") {
+    cmd.type = CommandType::SetClamp;
     for (uint8_t i = 3; i < fieldCount; ++i) {
       String key, value;
       if (!parseKeyValue(fields[i], key, value)) {
@@ -149,12 +149,12 @@ Command CommandInterface::parseLine(String line) const {
       key.toLowerCase();
       value.toUpperCase();
       if (key != "position") { cmd.parseError = ErrorCode::InvalidCommand; return cmd; }
-      if      (value == "OPEN")    cmd.holderPosition = HolderPosition::Open;
-      else if (value == "CLOSED")  cmd.holderPosition = HolderPosition::Closed;
-      else if (value == "SERVICE") cmd.holderPosition = HolderPosition::Service;
+      if      (value == "OPEN")    cmd.clampPosition = ClampPosition::Open;
+      else if (value == "CLOSED")  cmd.clampPosition = ClampPosition::Closed;
+      else if (value == "SERVICE") cmd.clampPosition = ClampPosition::Service;
       else { cmd.parseError = ErrorCode::InvalidCommand; return cmd; }
     }
-    if (cmd.holderPosition == HolderPosition::Unknown) {
+    if (cmd.clampPosition == ClampPosition::Unknown) {
       cmd.parseError = ErrorCode::InvalidCommand;
       return cmd;
     }

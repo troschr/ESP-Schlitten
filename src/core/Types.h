@@ -37,12 +37,12 @@ enum class CommandType : uint8_t {
   Stop,
   Home,
   MoveTo,
-  SetServo,
+  SetClamp,
   SetDoorArm,
   ResetError,
 };
 
-enum class HolderPosition : uint8_t {
+enum class ClampPosition : uint8_t {
   Unknown,
   Open,
   Closed,
@@ -65,7 +65,7 @@ struct Command {
   ErrorCode parseError = ErrorCode::None;
   uint32_t id = 0;
   Position target;
-  HolderPosition holderPosition = HolderPosition::Unknown;
+  ClampPosition clampPosition = ClampPosition::Unknown;
   DoorArmPosition doorArmPosition = DoorArmPosition::Unknown;
   bool valid = false;
 };
@@ -121,12 +121,12 @@ inline const char *toString(ErrorCode error) {
   return "UNKNOWN";
 }
 
-inline const char *toString(HolderPosition pos) {
+inline const char *toString(ClampPosition pos) {
   switch (pos) {
-    case HolderPosition::Unknown: return "UNKNOWN";
-    case HolderPosition::Open:    return "OPEN";
-    case HolderPosition::Closed:  return "CLOSED";
-    case HolderPosition::Service: return "SERVICE";
+    case ClampPosition::Unknown: return "UNKNOWN";
+    case ClampPosition::Open:    return "OPEN";
+    case ClampPosition::Closed:  return "CLOSED";
+    case ClampPosition::Service: return "SERVICE";
   }
   return "UNKNOWN";
 }

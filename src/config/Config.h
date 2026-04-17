@@ -33,13 +33,13 @@ struct Motion {
   static constexpr bool kEnableActiveLow = true;
 };
 
-struct Servo {
+struct ClampServo {
   static constexpr uint8_t  kPwmChannel     = 0;
   static constexpr uint16_t kFrequencyHz    = 50;
   static constexpr uint8_t  kResolutionBits = 16;
-  static constexpr uint16_t kOpenUs         = 2000;
-  static constexpr uint16_t kClosedUs       = 1000;
-  static constexpr uint16_t kServiceUs      = 1500;
+  static constexpr uint16_t kOpenUs         = 2000;  // Platte freigegeben
+  static constexpr uint16_t kClosedUs       = 1000;  // Platte geklemmt
+  static constexpr uint16_t kServiceUs      = 1500;  // Mittelstellung
 };
 
 }  // namespace config

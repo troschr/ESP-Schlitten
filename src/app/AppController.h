@@ -19,7 +19,7 @@ class AppController {
   void processCommand(const Command &cmd);
   void handleMoveTo(const Command &cmd);
   void handleHome(const Command &cmd);
-  void handleSetServo(const Command &cmd);
+  void handleSetClamp(const Command &cmd);
   void handleSetDoorArm(const Command &cmd);
 
   void setState(AppState next);

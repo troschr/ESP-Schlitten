@@ -28,8 +28,8 @@ static constexpr int8_t kObstacleSensorPin = -1;
 // Greifer-Taster – noch nicht verdrahtet
 static constexpr int8_t kGripperDetectPin = -1;
 
-// Servo Plattenhalter – noch nicht verdrahtet
-static constexpr int8_t kServoPwmPin = -1;
+// Halteservo (Plattenklammer) – noch nicht verdrahtet
+static constexpr int8_t kClampServoPwmPin = -1;
 
 // Türarm-Aktor (Stepper oder Servo, noch nicht entschieden) – noch nicht verdrahtet
 static constexpr int8_t kDoorArmPin = -1;

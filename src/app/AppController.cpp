@@ -98,8 +98,8 @@ void AppController::processCommand(const Command &cmd) {
       handleMoveTo(cmd);
       return;
 
-    case CommandType::SetServo:
-      handleSetServo(cmd);
+    case CommandType::SetClamp:
+      handleSetClamp(cmd);
       return;
 
     case CommandType::SetDoorArm:
@@ -161,7 +161,7 @@ void AppController::handleMoveTo(const Command &cmd) {
   reporter_.sendOk(cmd.id, "MOVE_DONE", motionSnapshot());
 }
 
-void AppController::handleSetServo(const Command &cmd) {
+void AppController::handleSetClamp(const Command &cmd) {
   if (state_ == AppState::Error) {
     comm_.sendResponseError(cmd.id, ErrorCode::InvalidState);
     return;
@@ -173,8 +173,8 @@ void AppController::handleSetServo(const Command &cmd) {
 
   comm_.sendAck(cmd.id);
 
-  // TODO: ServoController aufrufen
-  String eventName = String("SERVO_") + toString(cmd.holderPosition);
+  // TODO: ClampServoController aufrufen
+  String eventName = String("CLAMP_") + toString(cmd.clampPosition);
   reporter_.sendOk(cmd.id, eventName.c_str(), motionSnapshot());
 }
 
