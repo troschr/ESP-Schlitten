@@ -36,7 +36,7 @@ constexpr uint16_t MICROSTEP_FACTOR = 1;
 constexpr uint16_t TOTAL_STEPS      = STEPS_PER_REV * MICROSTEP_FACTOR;
 
 // --- Zustand ------------------------------------------------------------
-uint32_t stepDelayUs = 2000;  // µs pro Flanke -> 2000 = ~250 Hz
+uint32_t stepDelayUs = 6000;  // µs pro Flanke -> 2000 = ~250 Hz
 bool     driverOn    = false;
 
 // --- Hilfsfunktionen ----------------------------------------------------
