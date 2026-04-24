@@ -20,42 +20,9 @@ Keine Motoren, keine Ablaufsteuerung.
   - `/dev/cu.usbserial-*`
   - `/dev/cu.usbmodem*`
 
-### I2C
+### Pinbelegung
 
-- `GPIO21` = `SDA`
-- `GPIO22` = `SCL`
-
-### VL53L1X
-
-Aktuell wird nur ein VL53L1X benutzt.
-Der `XSHUT`-Pin ist trotzdem angeschlossen.
-
-- `tof_1`
-  - `XSHUT = GPIO16`
-  - Adresse nach Init: `0x30`
-
-Verdrahtung:
-
-- `VIN -> 3V3`
-- `GND -> GND`
-- `SDA -> GPIO21`
-- `SCL -> GPIO22`
-- `XSHUT -> GPIO16`
-
-### Taster
-
-- `btn_1 = GPIO32`
-
-Je Taster:
-
-- ein Pin an GPIO
-- ein Pin an `GND`
-
-Logik:
-
-- offen = `HIGH`
-- gedrueckt = `LOW`
-- im Status: `1 = gedrueckt`
+→ siehe [Pinbelegung_ESP32.md](Pinbelegung_ESP32.md) (Abschnitt "Testaufbau")
 
 ## Was das Terminal senden kann
 
