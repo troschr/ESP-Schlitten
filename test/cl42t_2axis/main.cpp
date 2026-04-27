@@ -24,12 +24,12 @@ constexpr float STEPS_PER_MM_Y = 160.0f;
 // ── Geschwindigkeit & Rampe – Achse X ──────────────────────────────
 constexpr uint16_t X_MAX_SPEED_RPM   = 300;  // Höchstdrehzahl [U/min]
 constexpr uint16_t X_START_SPEED_RPM = 20;   // Anfahrdrehzahl [U/min]
-constexpr uint32_t X_ACCEL_STEPS     = 2000;  // Rampenlänge [Schritte]
+constexpr uint32_t X_ACCEL_STEPS     = 4000;  // Rampenlänge [Schritte]
 
 // ── Geschwindigkeit & Rampe – Achse Y ──────────────────────────────
 constexpr uint16_t Y_MAX_SPEED_RPM   = 300;  // Höchstdrehzahl [U/min]
 constexpr uint16_t Y_START_SPEED_RPM = 20;   // Anfahrdrehzahl [U/min]
-constexpr uint32_t Y_ACCEL_STEPS     = 2000;  // Rampenlänge [Schritte]
+constexpr uint32_t Y_ACCEL_STEPS     = 4000;  // Rampenlänge [Schritte]
 
 // ── CL42T Timing-Minima laut Datenblatt ────────────────────────────
 constexpr uint32_t T_STEP_US = 3;  // PUL-Pulsbreite ≥ 2,5 µs
