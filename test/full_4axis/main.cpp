@@ -14,7 +14,8 @@
 //   home x|y|greifer|tuer Einzelne Achse auf Nullpunkt setzen
 //   greifer ein|aus       Greifer ein- oder ausfahren
 //   tuer ein|aus          Tür ein- oder ausfahren
-//   tuer oeffnen          Greifer aus → Schlitten +50mm + Greifer ein (gleichzeitig)
+//   tuer oeffnen          Greifer aus → Schlitten+Greifer ein+Tür auf (gleichzeitig)
+//   all go                goto 500/500 + Greifer+Tür je 5 Umdrehungen (gleichzeitig)
 //   ?                     Status anzeigen
 
 #include <Arduino.h>
@@ -63,7 +64,7 @@ constexpr uint32_t TUER_TRAVEL_STEPS    = 800;  // anpassen
 constexpr float TUER_SCHLITTEN_MM = 50.0f;
 
 // ── Schrittgeschwindigkeit DRV8825 (fester Wert, kein Rampe nötig) ──
-constexpr uint32_t DRV_STEP_DELAY_US = 1000;  // Halbperiode [µs]
+constexpr uint32_t DRV_STEP_DELAY_US = 2000;  // Halbperiode [µs]
 
 // ── DRV8825 Timing-Minimum laut Datenblatt ──────────────────────────
 constexpr uint32_t DRV_T_STEP_US = 2;
@@ -314,16 +315,8 @@ void runAxesAndAktor(ClMotor& mx, ClMotor& my,
 
 void handleAktor(Aktor& a, const String& arg) {
     if (arg == "aus") {
-        if (a.state == AktorState::AUSGEFAHREN) {
-            Serial.printf("%s: bereits ausgefahren\n", a.name);
-            return;
-        }
         moveAktor(a, true);
     } else if (arg == "ein") {
-        if (a.state == AktorState::EINGEFAHREN) {
-            Serial.printf("%s: bereits eingefahren\n", a.name);
-            return;
-        }
         moveAktor(a, false);
     } else {
         Serial.printf("ERR: %s ein|aus\n", a.name);
@@ -355,6 +348,33 @@ void handleTuerOeffnen() {
 
     axisX.positionMm = xZiel;
     axisY.positionMm = yZiel;
+}
+
+void handleAllGo() {
+    float dx = 500.0f - axisX.positionMm;
+    float dy = 500.0f - axisY.positionMm;
+    axisX.totalSteps = (uint32_t)(fabsf(dx) * STEPS_PER_MM_X + 0.5f);
+    axisY.totalSteps = (uint32_t)(fabsf(dy) * STEPS_PER_MM_Y + 0.5f);
+    axisX.forward    = dx >= 0.0f;
+    axisY.forward    = dy >= 0.0f;
+
+    // DRV8825: 5 Umdrehungen – travelSteps und State temporär überschreiben,
+    // da dies keine definierte Ein/Aus-Position ist.
+    uint32_t   savedGSteps = greifer.travelSteps; AktorState savedGState = greifer.state;
+    uint32_t   savedTSteps = tuer.travelSteps;    AktorState savedTState = tuer.state;
+    greifer.travelSteps = 5 * DRV_STEPS_PER_REV;
+    tuer.travelSteps    = 5 * DRV_STEPS_PER_REV;
+
+    Serial.println("all go: goto 500/500 + Greifer + Tuer je 5 Umdrehungen...");
+    runAxesAndAktor(axisX, axisY,
+                    greifer, true, DRV_STEP_DELAY_US,
+                    &tuer,   true, DRV_STEP_DELAY_US);
+
+    greifer.travelSteps = savedGSteps; greifer.state = savedGState;
+    tuer.travelSteps    = savedTSteps; tuer.state    = savedTState;
+
+    axisX.positionMm = 500.0f;
+    axisY.positionMm = 500.0f;
 }
 
 void handleGoto(const String& args) {
@@ -391,6 +411,7 @@ void printStatus() {
     Serial.println("  greifer ein|aus       Greifer ein-/ausfahren");
     Serial.println("  tuer ein|aus          Tür ein-/ausfahren");
     Serial.println("  tuer oeffnen          Greifer aus → Schlitten+Greifer ein");
+    Serial.println("  all go                goto 500/500 + alle 4 Motoren gleichzeitig");
     Serial.println("  ?                     Status");
     Serial.println("───────────────────────────────────────────────");
     Serial.printf("  Pos X: %.2f mm  |  Pos Y: %.2f mm\n",
@@ -441,6 +462,8 @@ void handleCommand(const String& raw) {
         }
     } else if (cmd.startsWith("greifer ")) {
         handleAktor(greifer, cmd.substring(8));
+    } else if (cmd == "all go") {
+        handleAllGo();
     } else if (cmd == "tuer oeffnen") {
         handleTuerOeffnen();
     } else if (cmd.startsWith("tuer ")) {
