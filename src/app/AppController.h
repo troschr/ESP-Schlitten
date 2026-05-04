@@ -1,44 +1,90 @@
 #pragma once
 
 #include <Arduino.h>
+#include <Wire.h>
 
 #include "comm/CommandInterface.h"
 #include "config/Config.h"
+#include "config/Pins.h"
 #include "core/Types.h"
+#include "drivers/ClMotor.h"
+#include "drivers/DrvActuator.h"
+#include "sensors/SensorManager.h"
 #include "status/StatusReporter.h"
 
 namespace esp_schlitten {
 
 class AppController {
- public:
-  void begin();
-  void update();
+public:
+    AppController();
+    void begin();
+    void update();
 
- private:
-  void processCommands();
-  void processCommand(const Command &cmd);
-  void handleMoveTo(const Command &cmd);
-  void handleHome(const Command &cmd);
-  void handleSetClamp(const Command &cmd);
-  void handleSetDoorArm(const Command &cmd);
+private:
+    // ── Kommandoverarbeitung ─────────────────────────────────────────────────
+    void processCommands();
+    void dispatchCommand(const Command &cmd);
+    void handlePing(const Command &cmd);
+    void handleStatus(const Command &cmd);
+    void handleStop(const Command &cmd);
+    void handleHome(const Command &cmd);
+    void handleHomeSwitchHit(const Command &cmd);
+    void handleMoveTo(const Command &cmd);
+    void handleResetError(const Command &cmd);
+    void handleSetClamp(const Command &cmd);
+    void handleSetDoorArm(const Command &cmd);
 
-  void setState(AppState next);
-  void enterError(ErrorCode error);
-  void publishStatus();
-  MotionSnapshot motionSnapshot() const;
-  SensorSnapshot sensorSnapshot() const;
+    // ── Zustandsupdates (während Bewegung) ───────────────────────────────────
+    void updateHoming();
+    void updateMoving();
+    void checkObstacleSensor();
+    void checkDriverAlarms();
 
-  CommandInterface comm_;
-  StatusReporter   reporter_;
+    // ── Zustandsmaschine ─────────────────────────────────────────────────────
+    void setState(AppState next);
+    void enterError(ErrorCode error);
+    void stopAllMotors();
 
-  AppState  state_    = AppState::NotReferenced;
-  ErrorCode error_    = ErrorCode::None;
-  Position  current_;
-  Position  target_;
+    // ── Status-Reporting ─────────────────────────────────────────────────────
+    void           publishStatus();
+    MotionSnapshot motionSnapshot() const;
+    SensorSnapshot readSensors();
 
-  bool     streamEnabled_   = false;
-  uint32_t lastStreamAtMs_  = 0;
-  uint32_t lastHeartbeatAtMs_ = 0;
+    // ── Hardware ─────────────────────────────────────────────────────────────
+    CommandInterface comm_;
+    StatusReporter   reporter_;
+    SensorManager    sensors_;
+
+    ClMotor axisX_;
+    ClMotor axisZ_;
+    DrvActuator gripper_;
+    DrvActuator doorArm_;
+
+    // ── Zustand ──────────────────────────────────────────────────────────────
+    AppState  state_      = AppState::NotReferenced;
+    ErrorCode error_      = ErrorCode::None;
+    bool      referenced_ = false;
+    Position  current_;
+    Position  target_;
+
+    // Homing
+    uint32_t homingStartMs_     = 0;
+    uint32_t pendingHomeCmdId_  = 0;
+    bool     xHomed_            = false;
+    bool     zHomed_            = false;
+
+    // Moving
+    uint32_t moveStartMs_       = 0;
+    uint32_t pendingMoveCmdId_  = 0;
+
+    // Sensoren (gecacht)
+    SensorSnapshot cachedSensors_;
+    uint32_t       lastSensorPollMs_ = 0;
+
+    // Streaming / Heartbeat
+    bool     streamEnabled_     = false;
+    uint32_t lastStreamMs_      = 0;
+    uint32_t lastHeartbeatMs_   = 0;
 };
 
 }  // namespace esp_schlitten

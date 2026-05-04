@@ -1,38 +1,34 @@
 #pragma once
+#include <stdint.h>
 
-#include <Arduino.h>
+// Pinbelegung ESP32 – aus full_system Test übernommen.
 
-namespace esp_schlitten {
-namespace pins {
+namespace Pins {
 
-// I2C – Türsensor (VL53L0X, bereits getestet)
-static constexpr int8_t kI2cSdaPin    = 21;
-static constexpr int8_t kI2cSclPin    = 22;
-static constexpr int8_t kTofXshutPin  = 16;
+// I2C (VL53L0X Türsensor + TF-Luna Hindernissensor)
+constexpr uint8_t SDA = 21;
+constexpr uint8_t SCL = 22;
 
-// X-Achse (Stepper) – noch nicht verdrahtet
-static constexpr int8_t kAxisXStepPin   = -1;
-static constexpr int8_t kAxisXDirPin    = -1;
-static constexpr int8_t kAxisXEnablePin = -1;
-static constexpr int8_t kHomeXPin       = -1;
+// CL42T – X-Achse (Schlitten horizontal)
+constexpr uint8_t X_STEP = 27;
+constexpr uint8_t X_DIR  = 14;
+constexpr uint8_t X_EN   = 12;
+constexpr uint8_t X_ALM  = 13;  // Alarm: active-LOW bei Treiberfehler
 
-// Z-Achse (Stepper) – noch nicht verdrahtet
-static constexpr int8_t kAxisZStepPin   = -1;
-static constexpr int8_t kAxisZDirPin    = -1;
-static constexpr int8_t kAxisZEnablePin = -1;
-static constexpr int8_t kHomeZPin       = -1;
+// CL42T – Z-Achse (Schlitten vertikal)
+constexpr uint8_t Z_STEP = 32;
+constexpr uint8_t Z_DIR  = 33;
+constexpr uint8_t Z_EN   = 25;
+constexpr uint8_t Z_ALM  = 26;
 
-// Hindernissensor – Typ und Pin noch offen
-static constexpr int8_t kObstacleSensorPin = -1;
+// DRV8825 – Greifer
+constexpr uint8_t GRIPPER_STEP = 23;
+constexpr uint8_t GRIPPER_DIR  = 19;
+constexpr uint8_t GRIPPER_EN   = 18;
 
-// Greifer-Taster – noch nicht verdrahtet
-static constexpr int8_t kGripperDetectPin = -1;
+// DRV8825 – Türarm
+constexpr uint8_t DOOR_STEP = 17;
+constexpr uint8_t DOOR_DIR  = 16;
+constexpr uint8_t DOOR_EN   = 15;
 
-// Halteservo (Plattenklammer) – noch nicht verdrahtet
-static constexpr int8_t kClampServoPwmPin = -1;
-
-// Türarm-Aktor (Stepper oder Servo, noch nicht entschieden) – noch nicht verdrahtet
-static constexpr int8_t kDoorArmPin = -1;
-
-}  // namespace pins
-}  // namespace esp_schlitten
+}  // namespace Pins

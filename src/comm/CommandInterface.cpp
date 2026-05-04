@@ -111,6 +111,30 @@ Command CommandInterface::parseLine(String line) const {
   if (verb == "HOME")        { cmd.type = CommandType::Home;      cmd.valid = true; return cmd; }
   if (verb == "RESET_ERROR") { cmd.type = CommandType::ResetError; cmd.valid = true; return cmd; }
 
+  // --- HOME_SWITCH_HIT;axis=<X|Z> ---
+  if (verb == "HOME_SWITCH_HIT") {
+    cmd.type = CommandType::HomeSwitchHit;
+    for (uint8_t i = 3; i < fieldCount; ++i) {
+      String key, value;
+      if (!parseKeyValue(fields[i], key, value)) {
+        cmd.parseError = ErrorCode::InvalidCommand;
+        return cmd;
+      }
+      key.toLowerCase();
+      value.toUpperCase();
+      if (key != "axis") { cmd.parseError = ErrorCode::InvalidCommand; return cmd; }
+      if      (value == "X") cmd.axis = HomingAxis::X;
+      else if (value == "Z") cmd.axis = HomingAxis::Z;
+      else { cmd.parseError = ErrorCode::InvalidCommand; return cmd; }
+    }
+    if (cmd.axis == HomingAxis::None) {
+      cmd.parseError = ErrorCode::InvalidCommand;
+      return cmd;
+    }
+    cmd.valid = true;
+    return cmd;
+  }
+
   // --- MOVE_TO;x=<mm>;z=<mm> ---
   if (verb == "MOVE_TO") {
     cmd.type = CommandType::MoveTo;

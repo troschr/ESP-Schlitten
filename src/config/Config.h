@@ -1,46 +1,74 @@
 #pragma once
 
-#include <Arduino.h>
+// Alle anpassbaren Parameter an einem Ort.
+// Achsen-Geometrie, Geschwindigkeiten und Timeouts hier eintragen.
 
-namespace esp_schlitten {
-namespace config {
+namespace Config {
 
-struct Serial {
-  static constexpr uint32_t kBaudRate = 115200;
-};
+namespace Serial {
+    constexpr uint32_t BAUD_RATE = 115200;
+}
 
-struct Timing {
-  static constexpr uint32_t kHeartbeatIntervalMs = 1000;  // TODO: mit Pi abstimmen
-  static constexpr uint32_t kStreamIntervalMs    = 1000;
-};
+// ─── CL42T X-Achse (Schlitten horizontal) ────────────────────────────────────
+namespace MotionX {
+    constexpr float    STEPS_PER_MM   = 160.0f;  // Schritte/mm (abhängig von Spindel + DIP-Schalter)
+    constexpr uint32_t STEPS_PER_REV  = 800;      // Mikroschritte/Umdrehung (DIP am CL42T)
+    constexpr uint16_t MAX_RPM        = 300;       // Maximalgeschwindigkeit
+    constexpr uint16_t START_RPM      = 20;        // Startgeschwindigkeit (Fuß der Rampe)
+    constexpr uint16_t HOMING_RPM     = 30;        // Geschwindigkeit während Referenzfahrt
+    constexpr uint32_t ACCEL_STEPS    = 4000;      // Rampenlänge in Schritten
+    constexpr uint32_t STEP_US        = 3;         // STEP-Pulsbreite µs (CL42T min. 2,5 µs)
+    constexpr uint32_t DIR_US         = 5;         // DIR-Setup vor erstem STEP µs
+    constexpr bool     HOMING_FORWARD = false;     // Richtung Referenzposition (false = rückwärts)
+}
 
-struct Sensor {
-  // Türsensor: Distanz über diesem Wert gilt als "Tür offen"
-  static constexpr uint16_t kDoorOpenThresholdMm = 200;  // TODO: am echten Aufbau bestätigen
+// ─── CL42T Z-Achse (Schlitten vertikal) ──────────────────────────────────────
+namespace MotionZ {
+    constexpr float    STEPS_PER_MM   = 160.0f;
+    constexpr uint32_t STEPS_PER_REV  = 800;
+    constexpr uint16_t MAX_RPM        = 300;
+    constexpr uint16_t START_RPM      = 20;
+    constexpr uint16_t HOMING_RPM     = 30;
+    constexpr uint32_t ACCEL_STEPS    = 4000;
+    constexpr uint32_t STEP_US        = 3;
+    constexpr uint32_t DIR_US         = 5;
+    constexpr bool     HOMING_FORWARD = false;
+}
 
-  // Hindernissensor: Grenzen für Fahrtfreigabe
-  static constexpr uint16_t kObstacleStopDistanceMm = 60;   // TODO: am echten Aufbau bestätigen
-  static constexpr uint16_t kObstacleWarnDistanceMm = 120;  // TODO: am echten Aufbau bestätigen
-};
+// ─── DRV8825 Greifer ──────────────────────────────────────────────────────────
+namespace Gripper {
+    constexpr uint32_t STEPS_PER_REV = 200;       // Vollschritte/Umdrehung (DRV8825 ohne Mikroschritt)
+    constexpr uint32_t TRAVEL_STEPS  = 800;        // Schritte für vollständige Ein-/Ausfahrt
+    constexpr uint32_t STEP_DELAY_US = 2000;       // Zeit zwischen zwei Schritten µs
+    constexpr uint32_t STEP_US       = 2;          // STEP-Pulsbreite µs
+    constexpr uint32_t DIR_US        = 1;          // DIR-Setup µs
+}
 
-struct Motion {
-  // Alle Werte in mm – Umrechnung in Steps macht der jeweilige Achscontroller intern
-  // TODO: steps_per_mm je Achse festlegen wenn Mechanik bekannt
-  static constexpr uint32_t kMoveTimeoutMs   = 20000;  // TODO: am echten Aufbau bestätigen
-  static constexpr uint32_t kHomingTimeoutMs = 15000;  // TODO: am echten Aufbau bestätigen
-  static constexpr uint8_t  kPositionToleranceMm = 1;  // TODO: am echten Aufbau bestätigen
+// ─── DRV8825 Türarm ───────────────────────────────────────────────────────────
+namespace DoorArm {
+    constexpr uint32_t STEPS_PER_REV = 200;
+    constexpr uint32_t TRAVEL_STEPS  = 800;
+    constexpr uint32_t STEP_DELAY_US = 2000;
+    constexpr uint32_t STEP_US       = 2;
+    constexpr uint32_t DIR_US        = 1;
+}
 
-  static constexpr bool kEnableActiveLow = true;
-};
+// ─── Timing ───────────────────────────────────────────────────────────────────
+namespace Timing {
+    constexpr uint32_t HEARTBEAT_MS    = 1000;
+    constexpr uint32_t STREAM_MS       = 100;
+    constexpr uint32_t MOVE_TIMEOUT_MS = 20000;
+    constexpr uint32_t HOME_TIMEOUT_MS = 15000;
+    constexpr uint32_t SENSOR_POLL_MS  = 50;      // Hindernissensor-Abfrageintervall während Fahrt
+}
 
-struct ClampServo {
-  static constexpr uint8_t  kPwmChannel     = 0;
-  static constexpr uint16_t kFrequencyHz    = 50;
-  static constexpr uint8_t  kResolutionBits = 16;
-  static constexpr uint16_t kOpenUs         = 2000;  // Platte freigegeben
-  static constexpr uint16_t kClosedUs       = 1000;  // Platte geklemmt
-  static constexpr uint16_t kServiceUs      = 1500;  // Mittelstellung
-};
+// ─── Sensoren ─────────────────────────────────────────────────────────────────
+namespace Sensor {
+    constexpr uint16_t DOOR_OPEN_MM     = 200;    // VL53L0X: unter diesem Wert = Tür offen
+    constexpr uint16_t OBSTACLE_STOP_MM = 60;     // TF-Luna: Stopp-Abstand
+    constexpr uint16_t OBSTACLE_WARN_MM = 120;    // TF-Luna: Warnabstand
+    constexpr uint16_t TFLUNA_AMP_MIN   = 100;    // Mindestsignalstärke TF-Luna
+    constexpr uint8_t  TFLUNA_ADDR      = 0x10;
+}
 
-}  // namespace config
-}  // namespace esp_schlitten
+}  // namespace Config

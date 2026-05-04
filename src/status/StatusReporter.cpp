@@ -25,8 +25,10 @@ void StatusReporter::sendStatus(const StatusSnapshot &s) {
     ";target_x="                     + s.motion.target.x_mm +
     ";target_z="                     + s.motion.target.z_mm +
     ";busy="                         + (s.motion.busy ? "1" : "0") +
-    ";gripper="                      + (s.sensors.gripperDetected ? "1" : "0") +
+    ";gripper_home="                 + (s.sensors.gripperHome ? "1" : "0") +
+    ";door_arm_home="                + (s.sensors.doorArmHome ? "1" : "0") +
     ";obstacle_ok="                  + (s.sensors.obstacleOk ? "1" : "0") +
+    ";door_open="                    + (s.sensors.doorOpen ? "1" : "0") +
     ";door_dist_mm="                 + s.sensors.doorDistanceMm);
 }
 
