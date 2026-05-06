@@ -42,8 +42,10 @@ void AppController::update() {
     processCommands();
 
     switch (state_) {
-        case AppState::BusyHoming: updateHoming(); break;
-        case AppState::BusyMoving: updateMoving(); break;
+        case AppState::BusyHoming:   updateHoming();   break;
+        case AppState::BusyScanning: updateScanning(); break;
+        case AppState::BusyMoving:   updateMoving();   break;
+        case AppState::BusyMoveHome: updateMoveHome(); break;
         default: break;
     }
 
@@ -93,6 +95,7 @@ void AppController::dispatchCommand(const Command &cmd) {
         case CommandType::Home:          handleHome(cmd);          return;
         case CommandType::HomeSwitchHit: handleHomeSwitchHit(cmd); return;
         case CommandType::MoveTo:        handleMoveTo(cmd);        return;
+        case CommandType::MoveHome:      handleMoveHome(cmd);      return;
         case CommandType::ResetError:    handleResetError(cmd);    return;
         case CommandType::SetClamp:      handleSetClamp(cmd);      return;
         case CommandType::SetDoorArm:    handleSetDoorArm(cmd);    return;
@@ -126,28 +129,29 @@ void AppController::handleHome(const Command &cmd) {
         comm_.sendResponseError(cmd.id, ErrorCode::InvalidState);
         return;
     }
-    if (state_ == AppState::BusyHoming || state_ == AppState::BusyMoving) {
+    if (state_ == AppState::BusyHoming || state_ == AppState::BusyMoving ||
+        state_ == AppState::BusyScanning || state_ == AppState::BusyMoveHome) {
         comm_.sendResponseError(cmd.id, ErrorCode::Busy);
         return;
     }
 
     comm_.sendAck(cmd.id);
 
-    xHomed_            = false;
-    zHomed_            = false;
-    pendingHomeCmdId_  = cmd.id;
-    homingStartMs_     = millis();
-    referenced_        = false;
-    error_             = ErrorCode::None;
+    xHomed_           = false;
+    zHomed_           = false;
+    homingZStarted_   = false;
+    pendingHomeCmdId_ = cmd.id;
+    homingStartMs_    = millis();
+    referenced_       = false;
+    error_            = ErrorCode::None;
 
     axisX_.startHoming(Config::MotionX::HOMING_FORWARD, Config::MotionX::HOMING_RPM);
-    axisZ_.startHoming(Config::MotionZ::HOMING_FORWARD, Config::MotionZ::HOMING_RPM);
 
     setState(AppState::BusyHoming);
 }
 
 void AppController::handleHomeSwitchHit(const Command &cmd) {
-    if (state_ != AppState::BusyHoming) {
+    if (state_ != AppState::BusyHoming && state_ != AppState::BusyMoveHome) {
         comm_.sendResponseError(cmd.id, ErrorCode::InvalidState);
         return;
     }
@@ -169,7 +173,8 @@ void AppController::handleMoveTo(const Command &cmd) {
         comm_.sendResponseError(cmd.id, ErrorCode::InvalidState);
         return;
     }
-    if (state_ == AppState::BusyHoming || state_ == AppState::BusyMoving) {
+    if (state_ == AppState::BusyHoming || state_ == AppState::BusyMoving ||
+        state_ == AppState::BusyScanning || state_ == AppState::BusyMoveHome) {
         comm_.sendResponseError(cmd.id, ErrorCode::Busy);
         return;
     }
@@ -178,17 +183,50 @@ void AppController::handleMoveTo(const Command &cmd) {
         return;
     }
 
-    target_            = cmd.target;
-    pendingMoveCmdId_  = cmd.id;
-    moveStartMs_       = millis();
-    error_             = ErrorCode::None;
+    target_           = cmd.target;
+    pendingMoveCmdId_ = cmd.id;
+    error_            = ErrorCode::None;
 
     comm_.sendAck(cmd.id);
 
-    axisX_.moveTo((float)target_.x_mm);
-    axisZ_.moveTo((float)target_.z_mm);
+    if (current_.x_mm == 0 && current_.z_mm == 0) {
+        scanStartMs_ = millis();
+        axisZ_.moveTo(Config::MotionZ::MAX_TRAVEL_MM);
+        setState(AppState::BusyScanning);
+    } else {
+        moveStartMs_ = millis();
+        axisX_.moveTo((float)target_.x_mm);
+        axisZ_.moveTo((float)target_.z_mm);
+        setState(AppState::BusyMoving);
+    }
+}
 
-    setState(AppState::BusyMoving);
+void AppController::handleMoveHome(const Command &cmd) {
+    if (state_ == AppState::Error) {
+        comm_.sendResponseError(cmd.id, ErrorCode::InvalidState);
+        return;
+    }
+    if (state_ == AppState::BusyHoming || state_ == AppState::BusyMoving ||
+        state_ == AppState::BusyScanning || state_ == AppState::BusyMoveHome) {
+        comm_.sendResponseError(cmd.id, ErrorCode::Busy);
+        return;
+    }
+    if (!referenced_) {
+        comm_.sendResponseError(cmd.id, ErrorCode::NotReferenced);
+        return;
+    }
+
+    comm_.sendAck(cmd.id);
+
+    xHomed_              = false;
+    zHomed_              = false;
+    homingZStarted_      = false;
+    pendingMoveHomeCmdId_ = cmd.id;
+    moveHomeStartMs_     = millis();
+    error_               = ErrorCode::None;
+
+    axisX_.startHoming(Config::MotionX::HOMING_FORWARD, Config::MotionX::HOMING_RPM);
+    setState(AppState::BusyMoveHome);
 }
 
 void AppController::handleResetError(const Command &cmd) {
@@ -210,7 +248,8 @@ void AppController::handleSetClamp(const Command &cmd) {
         comm_.sendResponseError(cmd.id, ErrorCode::InvalidState);
         return;
     }
-    if (state_ == AppState::BusyHoming || state_ == AppState::BusyMoving) {
+    if (state_ == AppState::BusyHoming || state_ == AppState::BusyMoving ||
+        state_ == AppState::BusyScanning || state_ == AppState::BusyMoveHome) {
         comm_.sendResponseError(cmd.id, ErrorCode::Busy);
         return;
     }
@@ -225,7 +264,8 @@ void AppController::handleSetDoorArm(const Command &cmd) {
         comm_.sendResponseError(cmd.id, ErrorCode::InvalidState);
         return;
     }
-    if (state_ == AppState::BusyHoming || state_ == AppState::BusyMoving) {
+    if (state_ == AppState::BusyHoming || state_ == AppState::BusyMoving ||
+        state_ == AppState::BusyScanning || state_ == AppState::BusyMoveHome) {
         comm_.sendResponseError(cmd.id, ErrorCode::Busy);
         return;
     }
@@ -238,8 +278,14 @@ void AppController::handleSetDoorArm(const Command &cmd) {
 // ─── Zustandsupdates ─────────────────────────────────────────────────────────
 
 void AppController::updateHoming() {
-    if (!xHomed_) axisX_.update();
-    if (!zHomed_) axisZ_.update();
+    if (!xHomed_) {
+        axisX_.update();
+    } else if (!homingZStarted_) {
+        axisZ_.startHoming(Config::MotionZ::HOMING_FORWARD, Config::MotionZ::HOMING_RPM);
+        homingZStarted_ = true;
+    } else {
+        axisZ_.update();
+    }
 
     checkDriverAlarms();
     if (state_ != AppState::BusyHoming) return;
@@ -257,6 +303,61 @@ void AppController::updateHoming() {
         referenced_ = true;
         setState(AppState::Ready);
         reporter_.sendOk(pendingHomeCmdId_, "HOME_DONE", motionSnapshot());
+    }
+}
+
+void AppController::updateScanning() {
+    const bool zDone = axisZ_.update();
+
+    checkDriverAlarms();
+    if (state_ != AppState::BusyScanning) return;
+
+    const uint32_t now = millis();
+    if ((now - lastSensorPollMs_) >= Config::Timing::SENSOR_POLL_MS) {
+        lastSensorPollMs_ = now;
+        checkObstacleSensor();
+        if (state_ != AppState::BusyScanning) return;
+    }
+
+    if ((now - scanStartMs_) > Config::Timing::MOVE_TIMEOUT_MS) {
+        axisZ_.stop();
+        enterError(ErrorCode::MoveTimeout);
+        return;
+    }
+
+    if (zDone) {
+        moveStartMs_ = millis();
+        axisX_.moveTo((float)target_.x_mm);
+        axisZ_.moveTo((float)target_.z_mm);
+        setState(AppState::BusyMoving);
+    }
+}
+
+void AppController::updateMoveHome() {
+    if (!xHomed_) {
+        axisX_.update();
+    } else if (!homingZStarted_) {
+        axisZ_.startHoming(Config::MotionZ::HOMING_FORWARD, Config::MotionZ::HOMING_RPM);
+        homingZStarted_ = true;
+    } else {
+        axisZ_.update();
+    }
+
+    checkDriverAlarms();
+    if (state_ != AppState::BusyMoveHome) return;
+
+    if ((millis() - moveHomeStartMs_) > Config::Timing::HOME_TIMEOUT_MS) {
+        axisX_.stop();
+        axisZ_.stop();
+        enterError(ErrorCode::HomingTimeout);
+        return;
+    }
+
+    if (xHomed_ && zHomed_) {
+        current_ = Position{};
+        target_  = Position{};
+        setState(AppState::Ready);
+        reporter_.sendOk(pendingMoveHomeCmdId_, "MOVE_HOME_DONE", motionSnapshot());
     }
 }
 
@@ -358,7 +459,8 @@ MotionSnapshot AppController::motionSnapshot() const {
     m.current.x_mm = (int32_t)axisX_.positionMm();
     m.current.z_mm = (int32_t)axisZ_.positionMm();
     m.target       = target_;
-    m.busy         = (state_ == AppState::BusyHoming || state_ == AppState::BusyMoving);
+    m.busy         = (state_ == AppState::BusyHoming   || state_ == AppState::BusyScanning ||
+                      state_ == AppState::BusyMoving   || state_ == AppState::BusyMoveHome);
     m.referenced   = referenced_;
     return m;
 }

@@ -39,9 +39,10 @@ CMD;<id>;<befehl>[;<key>=<value>...]
 | STREAM OFF | `CMD;<id>;STREAM_OFF` | immer | ✅ |
 | STOP | `CMD;<id>;STOP` | immer | ✅ |
 | HOME | `CMD;<id>;HOME` | nicht `ERROR`, nicht busy | ✅ |
+| MOVE_HOME | `CMD;<id>;MOVE_HOME` | `READY` oder `STOPPED`, referenziert | ✅ |
 | MOVE_TO | `CMD;<id>;MOVE_TO;x=<mm>;z=<mm>` | `READY` oder `STOPPED`, referenziert | ✅ |
 | RESET_ERROR | `CMD;<id>;RESET_ERROR` | nur in `ERROR` | ✅ |
-| HOME_SWITCH_HIT | `CMD;<id>;HOME_SWITCH_HIT;axis=<X\|Z>` | nur in `BUSY_HOMING` | ✅ |
+| HOME_SWITCH_HIT | `CMD;<id>;HOME_SWITCH_HIT;axis=<X\|Z>` | nur in `BUSY_HOMING` oder `BUSY_MOVE_HOME` | ✅ |
 | SET_CLAMP | `CMD;<id>;SET_CLAMP;position=<OPEN\|CLOSED\|SERVICE>` | nicht `ERROR`, nicht busy | ⚠️ |
 | SET_DOOR_ARM | `CMD;<id>;SET_DOOR_ARM;position=<OPEN\|CLOSED>` | nicht `ERROR`, nicht busy | ⚠️ |
 
@@ -51,7 +52,7 @@ CMD;<id>;<befehl>[;<key>=<value>...]
 
 Der Pi schickt dieses Kommando, sobald er an seinem GPIO-Eingang einen Endschalter der Schlitten-Achse (X oder Z) erkennt. Der ESP stoppt daraufhin den zugehörigen Motor sofort und setzt die Achsposition auf 0 mm.
 
-Das Kommando ist **nur im Zustand `BUSY_HOMING` gültig**. In jedem anderen Zustand antwortet der ESP mit `ERR;INVALID_STATE`.
+Das Kommando ist **nur in den Zuständen `BUSY_HOMING` und `BUSY_MOVE_HOME` gültig**. In jedem anderen Zustand antwortet der ESP mit `ERR;INVALID_STATE`.
 
 | Feld | Typ | Pflicht | Bedeutung |
 |---|---|---|---|
@@ -69,7 +70,10 @@ CMD;2;HOME_SWITCH_HIT;axis=X
 
 ### ✅ Parameter MOVE_TO
 
-Beide Achsen werden immer gemeinsam angegeben – der ESP fährt zur angegebenen Zielposition. Wie er dort sicher hinkommt (Reihenfolge der Achsen, Kollisionsvermeidung, Rampen), entscheidet der ESP selbst.
+Beide Achsen werden immer gemeinsam angegeben – der ESP fährt zur angegebenen Zielposition. Beide Achsen fahren gleichzeitig.
+
+**Sonderfall: Start aus der Home-Position (x=0, z=0)**  
+Wenn der Schlitten an der Home-Position steht, führt der ESP vor der eigentlichen Fahrt automatisch einen **Z-Scan** durch: Die Z-Achse fährt zunächst die komplette Verfahrlänge nach oben (`MAX_TRAVEL_MM`), während der TF-Luna kontinuierlich auf Hindernisse prüft. Erst wenn der Scan abgeschlossen ist und kein Hindernis gefunden wurde, startet die Fahrt zur eigentlichen Zielposition. Der Zustand während des Scans ist `BUSY_SCANNING`.
 
 | Feld | Typ | Pflicht | Bedeutung |
 |---|---|---|---|
@@ -81,8 +85,22 @@ Beispiel:
 CMD;42;MOVE_TO;x=350;z=120
 ```
 
-> ⚠️ **Noch offen:** Achsreihenfolge – fährt der ESP beide Achsen gleichzeitig oder erst Z dann X (o.ä.)?  
 > ⚠️ **Noch offen:** Positionstoleranz – welche Abweichung in mm ist beim `MOVE_DONE` noch akzeptabel?
+
+---
+
+### ✅ MOVE_HOME
+
+Schickt den Schlitten zurück zur Home-Position. Im Gegensatz zu `MOVE_TO;x=0;z=0` fährt der ESP **nicht per Schrittzähler**, sondern langsam in Richtung Home und wartet auf die Bestätigung durch `HOME_SWITCH_HIT` vom Pi (identisches Verfahren wie bei `HOME`).
+
+- Voraussetzung: Schlitten muss referenziert sein (`ref=1`), kein aktiver Fehler, nicht busy
+- Reihenfolge: erst X, dann Z (sequenziell, wie bei `HOME`)
+- Abschluss: `MOVE_HOME_DONE`, Zustand → `READY`, Position `x=0;z=0`
+- Die Referenzierung bleibt erhalten (`ref=1` bleibt gesetzt)
+
+```
+CMD;<id>;MOVE_HOME
+```
 
 ---
 
@@ -138,7 +156,7 @@ Events kommen asynchron. Der Pi muss sie unabhängig von seinem Sendezustand ver
 ```
 EVT;<id>;OK;<event_name>;x=<mm>;z=<mm>
 EVT;0;STATE;<zustandscode>;ref=<0|1>;x=<mm>;z=<mm>
-EVT;0;STATUS;state=<z>;error=<e>;ref=<0|1>;x=<mm>;z=<mm>;target_x=<mm>;target_z=<mm>;busy=<0|1>;gripper=<0|1>;gripper_home=<0|1>;door_arm_home=<0|1>;obstacle_ok=<0|1>;door_open=<0|1>;door_dist_mm=<mm>
+EVT;0;STATUS;state=<z>;error=<e>;ref=<0|1>;x=<mm>;z=<mm>;target_x=<mm>;target_z=<mm>;busy=<0|1>;gripper_home=<0|1>;door_arm_home=<0|1>;obstacle_ok=<0|1>;door_open=<0|1>;door_dist_mm=<mm>
 EVT;0;ERR;<fehlercode>;x=<mm>;z=<mm>
 EVT;0;HEARTBEAT;uptime_ms=<ms>;state=<zustandscode>;x=<mm>;z=<mm>
 ```
@@ -151,6 +169,7 @@ EVT;0;HEARTBEAT;uptime_ms=<ms>;state=<zustandscode>;x=<mm>;z=<mm>
 |---|---|---|
 | `PONG` | Antwort auf PING | ✅ |
 | `HOME_DONE` | Referenzfahrt erfolgreich | ✅ |
+| `MOVE_HOME_DONE` | Rückfahrt zur Home-Position abgeschlossen | ✅ |
 | `MOVE_DONE` | Zielposition erreicht | ✅ |
 | `STOPPED` | STOP ausgeführt | ✅ |
 | `ERROR_RESET` | RESET_ERROR ausgeführt | ✅ |
@@ -180,7 +199,6 @@ Auf `CMD;<id>;STATUS`, bei jedem Eintritt in `ERROR` und periodisch wenn Stream 
 | `target_x` | Soll-Position X in mm | ✅ |
 | `target_z` | Soll-Position Z in mm | ✅ |
 | `busy` | `1` = Bewegung aktiv | ✅ |
-| `gripper` | `1` = Greifer-Taster aktiv (Platte erkannt) | ⚠️ |
 | `gripper_home` | `1` = Greifer-Endschalter in Heimposition (Taster am ESP) | ⚠️ |
 | `door_arm_home` | `1` = Türarm-Endschalter in Heimposition (Taster am ESP) | ⚠️ |
 | `obstacle_ok` | `1` = Hindernissensor gesund und frei | ✅ |
@@ -194,9 +212,7 @@ Danach folgt immer ein `EVT;0;STATUS`.
 
 #### EVT HEARTBEAT – Lebenszeichen des ESP
 
-Das Format ist festgelegt. Das Intervall ist noch offen.
-
-> ⚠️ **Noch offen:** Heartbeat-Intervall – wie oft soll der ESP den Heartbeat senden?
+Wird alle 1000 ms gesendet.
 
 ---
 
@@ -207,7 +223,9 @@ Das Format ist festgelegt. Das Intervall ist noch offen.
 | `NOT_REFERENCED` | Bereit, aber noch keine Referenzfahrt |
 | `READY` | Referenziert, wartet auf Kommando |
 | `BUSY_HOMING` | Referenzfahrt läuft |
+| `BUSY_SCANNING` | Z-Scan vor Fahrt aus Home-Position läuft |
 | `BUSY_MOVING` | Fahrt zu Zielposition läuft |
+| `BUSY_MOVE_HOME` | Rückfahrt zur Home-Position läuft |
 | `STOPPED` | Bewegung per STOP angehalten |
 | `ERROR` | Fehler, alle Motoren gestoppt, wartet auf RESET_ERROR |
 
@@ -234,22 +252,34 @@ Das Format ist festgelegt. Das Intervall ist noch offen.
 ## ✅ Zustandsübergänge
 
 ```
-                  ┌──────────────────────────────────────────────┐
-                  │                   STOP                        │
-                  ▼                                               │
-NOT_REFERENCED ──HOME──► BUSY_HOMING ──HOME_DONE──► READY ──MOVE_TO──► BUSY_MOVING
-      ▲                       │                      │  ▲               │
-      │                       │ Fehler               │  └───MOVE_DONE───┘
-      │                       ▼                      │
-      │                     ERROR ◄────Fehler─────────┘
-      │                       │
-      └────RESET_ERROR─────────┘
+            boot
+             │
+             ▼
+     NOT_REFERENCED
+             │ [HOME]¹
+             ▼
+       BUSY_HOMING ──[Fehler / Timeout]──────────────────────────► ERROR
+             │ [HOME_DONE]                                           ▲  │ [RESET_ERROR]
+             ▼                                                       │  ▼
+           READY                                                     │ NOT_REFERENCED
+             │
+             ├──[MOVE_TO, Startpos. x=0,z=0]──► BUSY_SCANNING ──[Fehler]──┘
+             │                                        │ [scan ok]
+             │                                        ▼
+             ├──[MOVE_TO, Startpos. x≠0/z≠0]──► BUSY_MOVING ──[Fehler]──► ERROR
+             │                                        │ [MOVE_DONE]
+             │                                        └───────────────► READY
+             │
+             └──[MOVE_HOME]──────────────────► BUSY_MOVE_HOME ──[Fehler / Timeout]──► ERROR
+                                                     │ [MOVE_HOME_DONE]
+                                                     └──────────────────────────► READY
 ```
 
-- `STOP` ist aus **jedem** Zustand möglich → landet in `STOPPED`
-- `STOPPED` verhält sich wie `READY` für `HOME` und `MOVE_TO`
-- `RESET_ERROR` → `NOT_REFERENCED`, Referenzierung gelöscht → danach `HOME` Pflicht
-- Jeder Fehler während Homing oder Bewegung → sofort `ERROR`, Motoren gestoppt
+- `STOP` ist aus **jedem** Zustand außer `ERROR` möglich → landet in `STOPPED`
+- `STOPPED` verhält sich wie `READY`: `HOME`, `MOVE_TO` und `MOVE_HOME` sind möglich
+- ¹ `HOME` ist auch aus `READY` und `STOPPED` erlaubt (setzt Referenzierung zurück → danach erneute Referenzfahrt nötig)
+- `RESET_ERROR` → `NOT_REFERENCED`, Referenzierung gelöscht
+- Jeder Fehler / Timeout während eines `BUSY_*`-Zustands → sofort `ERROR`, Motoren gestoppt
 
 ---
 
@@ -284,14 +314,47 @@ Greifer- und Türarm-Endschalter wertet der ESP intern aus – kein Kommando nö
 ← EVT;0;STATE;READY;ref=1;x=0;z=0
 ```
 
-### Zielposition anfahren
+### Zielposition anfahren (aus Home-Position – mit Z-Scan)
+
+Wenn der Schlitten an der Home-Position steht (x=0, z=0), fährt der ESP zuerst die Z-Achse komplett hoch und prüft dabei den Hindernissensor.
 
 ```
 → CMD;2;MOVE_TO;x=350;z=120
 ← RSP;2;ACK
-← EVT;0;STATE;BUSY_MOVING;ref=1;x=0;z=0
+← EVT;0;STATE;BUSY_SCANNING;ref=1;x=0;z=0
+  [ESP fährt Z-Achse nach oben, TF-Luna läuft mit]
+  [Scan abgeschlossen, kein Hindernis]
+← EVT;0;STATE;BUSY_MOVING;ref=1;x=0;z=500
 ← EVT;2;OK;MOVE_DONE;x=350;z=120
 ← EVT;0;STATE;READY;ref=1;x=350;z=120
+```
+
+### Zielposition anfahren (nicht aus Home-Position – ohne Scan)
+
+```
+→ CMD;2;MOVE_TO;x=500;z=80
+← RSP;2;ACK
+← EVT;0;STATE;BUSY_MOVING;ref=1;x=350;z=120
+← EVT;2;OK;MOVE_DONE;x=500;z=80
+← EVT;0;STATE;READY;ref=1;x=500;z=80
+```
+
+### Heimfahrt (MOVE_HOME)
+
+```
+→ CMD;10;MOVE_HOME
+← RSP;10;ACK
+← EVT;0;STATE;BUSY_MOVE_HOME;ref=1;x=350;z=120
+  [ESP fährt X-Achse Richtung Home]
+  [Pi erkennt X-Endschalter an GPIO]
+→ CMD;11;HOME_SWITCH_HIT;axis=X
+← RSP;11;ACK
+  [ESP stoppt X-Motor, setzt X=0 mm, fährt Z-Achse Richtung Home]
+  [Pi erkennt Z-Endschalter an GPIO]
+→ CMD;12;HOME_SWITCH_HIT;axis=Z
+← RSP;12;ACK
+← EVT;10;OK;MOVE_HOME_DONE;x=0;z=0
+← EVT;0;STATE;READY;ref=1;x=0;z=0
 ```
 
 ### Türprüfung nach Anfahren
@@ -321,7 +384,7 @@ Greifer- und Türarm-Endschalter wertet der ESP intern aus – kein Kommando nö
 ### Heartbeat
 
 ```
-← EVT;0;HEARTBEAT;uptime_ms=45231;state=READY;x=350;x=120
+← EVT;0;HEARTBEAT;uptime_ms=45231;state=READY;x=350;z=120
 ← EVT;0;HEARTBEAT;uptime_ms=46231;state=READY;x=350;z=120
 ```
 
@@ -344,9 +407,10 @@ Greifer- und Türarm-Endschalter wertet der ESP intern aus – kein Kommando nö
 - Sensor: **TF-Luna** (I2C-LiDAR)
 - Hängt am gleichen I2C-Bus wie der Türsensor (VL53L0X)
 - Sitzt am Schlitten, zeigt in Fahrtrichtung
-- Wird **während der Fahrt** ausgewertet
+- Wird in zwei Phasen ausgewertet:
+  1. **Z-Scan** (`BUSY_SCANNING`): Vor jeder Fahrt aus der Home-Position fährt Z komplett hoch und der Sensor prüft, ob auf irgendeiner Höhe ein Hindernis (z.B. offene Druckertür) im Weg ist
+  2. **Während der Fahrt** (`BUSY_MOVING`): kontinuierliche Prüfung alle 50 ms
 - Löst bei Unterschreitung des Stoppabstands sofort `ERROR;OBSTACLE` aus
-- Richtungsabhängig: bei X-Bewegung relevant, bei Z ggf. anders (abhängig von Montageposition)
 
 > ⚠️ **Noch offen:** Montageposition am Schlitten, Stoppabstand und Warnabstand in mm, I2C-Adresse (Default: 0x10)
 
@@ -413,33 +477,12 @@ Der CL42T regelt Positions-Folgefehler selbst. Übersteigt der Fehler den intern
 | Schritte/mm (X-Achse) | noch offen | ⚠️ |
 | Schritte/mm (Z-Achse) | noch offen | ⚠️ |
 | Türsensor Schwelle „offen" | ~200 mm | ⚠️ noch zu bestätigen |
-| Heartbeat-Intervall | noch offen | ⚠️ |
-| Stream-Intervall | noch festzulegen | ⚠️ |
+| Heartbeat-Intervall | 1000 ms | ✅ |
+| Stream-Intervall | 100 ms | ✅ |
+| Hindernissensor Abfrageintervall | 50 ms | ✅ |
 | Hindernissensor Stoppabstand | noch offen | ⚠️ |
 | Hindernissensor Warnabstand | noch offen | ⚠️ |
-| Homing-Timeout | noch festzulegen | ⚠️ |
-| Bewegungs-Timeout | noch festzulegen | ⚠️ |
+| Homing-Timeout | 15.000 ms | ✅ |
+| Bewegungs-Timeout | 20.000 ms | ✅ |
 | Positionstoleranz | noch festzulegen | ⚠️ |
 
----
-
-## Offene Punkte (Zusammenfassung)
-
-| Thema | Frage |
-|---|---|
-| Motortyp X / Z | Welcher NEMA-17-Motor (mit Encoder) wird verbaut? Spezifikation notwendig für Strom-Einstellung am CL42T. |
-| Mechanik X / Z | Spindelsteigung oder Riemenübersetzung → bestimmt Schritte/mm |
-| Mikro-Schritt-Einstellung | Welcher DIP-Wert am CL42T (800–51.200 Schritte/U)? |
-| GPIO-Belegung (STEP/DIR/ENA/ALM) | Konkrete ESP32-Pins für X- und Z-Treiber noch nicht festgelegt |
-| Türöffnungs-Mechanismus | Wie wird die Druckertür geöffnet? Servo, Stepper, Hebel? Aktor am Schlitten? |
-| Platten-Entnahme | Wie wird die Platte gegriffen und aus dem Drucker gezogen? |
-| Platten-Fixierung | Wie wird die Platte auf dem Schlitten gehalten? Servo-Klemme, Magnet, Vakuum? |
-| SET_CLAMP-Steuerung | Direktes Kommando vom Pi, oder implizit durch ESP-internen Ablauf? |
-| Türarm-Aktor | Stepper oder Servo? (beeinflusst interne ESP-Implementierung, nicht das Protokoll) |
-| Hindernissensor Montage | TF-Luna festgelegt (I2C) – Montageposition und Abstände noch offen |
-| Achsreihenfolge beim Homing | Fährt der ESP X und Z gleichzeitig oder sequenziell? Was ist die Heimfahrgeschwindigkeit und gibt es eine Freifahrphase (Langsam-Rückfahren nach Taster)? |
-| Achsreihenfolge bei MOVE_TO | Fährt der ESP immer beide Achsen gleichzeitig, oder erst Z dann X (o.ä.)? |
-| Positionstoleranz | Welche Abweichung in mm ist beim MOVE_DONE noch akzeptabel? |
-| Heartbeat-Intervall | Wie oft soll der ESP den Heartbeat senden? |
-| Türsensor-Schwelle | Welche Distanz gilt als „Tür offen"? (~200 mm, noch zu bestätigen) |
-| Positionsformat | Reichen ganzzahlige mm, oder wird 0,1 mm Auflösung benötigt? |

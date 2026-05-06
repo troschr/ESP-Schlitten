@@ -30,13 +30,16 @@ private:
     void handleHome(const Command &cmd);
     void handleHomeSwitchHit(const Command &cmd);
     void handleMoveTo(const Command &cmd);
+    void handleMoveHome(const Command &cmd);
     void handleResetError(const Command &cmd);
     void handleSetClamp(const Command &cmd);
     void handleSetDoorArm(const Command &cmd);
 
     // ── Zustandsupdates (während Bewegung) ───────────────────────────────────
     void updateHoming();
+    void updateScanning();
     void updateMoving();
+    void updateMoveHome();
     void checkObstacleSensor();
     void checkDriverAlarms();
 
@@ -67,15 +70,22 @@ private:
     Position  current_;
     Position  target_;
 
-    // Homing
-    uint32_t homingStartMs_     = 0;
-    uint32_t pendingHomeCmdId_  = 0;
-    bool     xHomed_            = false;
-    bool     zHomed_            = false;
+    // Homing / MoveHome
+    uint32_t homingStartMs_       = 0;
+    uint32_t pendingHomeCmdId_    = 0;
+    bool     xHomed_              = false;
+    bool     zHomed_              = false;
+    bool     homingZStarted_      = false;
+
+    uint32_t moveHomeStartMs_     = 0;
+    uint32_t pendingMoveHomeCmdId_ = 0;
+
+    // Scanning
+    uint32_t scanStartMs_         = 0;
 
     // Moving
-    uint32_t moveStartMs_       = 0;
-    uint32_t pendingMoveCmdId_  = 0;
+    uint32_t moveStartMs_         = 0;
+    uint32_t pendingMoveCmdId_    = 0;
 
     // Sensoren (gecacht)
     SensorSnapshot cachedSensors_;

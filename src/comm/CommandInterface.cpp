@@ -109,6 +109,7 @@ Command CommandInterface::parseLine(String line) const {
   if (verb == "STREAM_OFF")  { cmd.type = CommandType::StreamOff; cmd.valid = true; return cmd; }
   if (verb == "STOP")        { cmd.type = CommandType::Stop;      cmd.valid = true; return cmd; }
   if (verb == "HOME")        { cmd.type = CommandType::Home;      cmd.valid = true; return cmd; }
+  if (verb == "MOVE_HOME")   { cmd.type = CommandType::MoveHome;  cmd.valid = true; return cmd; }
   if (verb == "RESET_ERROR") { cmd.type = CommandType::ResetError; cmd.valid = true; return cmd; }
 
   // --- HOME_SWITCH_HIT;axis=<X|Z> ---

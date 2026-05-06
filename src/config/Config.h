@@ -33,6 +33,7 @@ namespace MotionZ {
     constexpr uint32_t STEP_US        = 3;
     constexpr uint32_t DIR_US         = 5;
     constexpr bool     HOMING_FORWARD = false;
+    constexpr float    MAX_TRAVEL_MM  = 500.0f;  // maximale Z-Verfahrlänge für Scan
 }
 
 // ─── DRV8825 Greifer ──────────────────────────────────────────────────────────

@@ -8,7 +8,9 @@ enum class AppState : uint8_t {
     NotReferenced,
     Ready,
     BusyHoming,
+    BusyScanning,
     BusyMoving,
+    BusyMoveHome,
     Stopped,
     Error,
 };
@@ -38,6 +40,7 @@ enum class CommandType : uint8_t {
     Home,
     HomeSwitchHit,
     MoveTo,
+    MoveHome,
     SetClamp,
     SetDoorArm,
     ResetError,
@@ -107,7 +110,9 @@ inline const char *toString(AppState state) {
         case AppState::NotReferenced: return "NOT_REFERENCED";
         case AppState::Ready:         return "READY";
         case AppState::BusyHoming:    return "BUSY_HOMING";
+        case AppState::BusyScanning:  return "BUSY_SCANNING";
         case AppState::BusyMoving:    return "BUSY_MOVING";
+        case AppState::BusyMoveHome:  return "BUSY_MOVE_HOME";
         case AppState::Stopped:       return "STOPPED";
         case AppState::Error:         return "ERROR";
     }
