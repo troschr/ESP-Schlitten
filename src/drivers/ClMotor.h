@@ -5,6 +5,8 @@
 // Positionsangabe in mm; Umrechnung in Schritte intern.
 // update() muss jeden Loop-Durchlauf aufgerufen werden.
 
+namespace esp_schlitten {
+
 class ClMotor {
 public:
     ClMotor(uint8_t pinStep, uint8_t pinDir, uint8_t pinEn, uint8_t pinAlm,
@@ -57,3 +59,5 @@ private:
     bool     _homingMode    = false;
     uint32_t _nextStepUs    = 0;
 };
+
+}  // namespace esp_schlitten

@@ -20,12 +20,14 @@ void CommandInterface::poll() {
           sendResponseError(cmd.id, ErrorCode::Busy);
         }
         inputBuffer_ = "";
+        inputBuffer_.reserve(kMaxLineLength);
       }
       continue;
     }
 
     if (inputBuffer_.length() >= kMaxLineLength) {
       inputBuffer_ = "";
+      inputBuffer_.reserve(kMaxLineLength);
       sendResponseError(0, ErrorCode::InvalidCommand);
       continue;
     }
@@ -96,7 +98,12 @@ Command CommandInterface::parseLine(String line) const {
   }
 
   fields[1].trim();
-  cmd.id = static_cast<uint32_t>(fields[1].toInt());
+  const long idVal = fields[1].toInt();
+  if (idVal < 0) {
+    cmd.parseError = ErrorCode::InvalidCommand;
+    return cmd;
+  }
+  cmd.id = static_cast<uint32_t>(idVal);
 
   fields[2].trim();
   fields[2].toUpperCase();

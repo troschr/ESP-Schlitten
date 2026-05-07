@@ -89,7 +89,8 @@ private:
 
     // Sensoren (gecacht)
     SensorSnapshot cachedSensors_;
-    uint32_t       lastSensorPollMs_ = 0;
+    uint32_t       lastSensorPollMs_      = 0;
+    uint8_t        obstacleFaultCount_    = 0;
 
     // Streaming / Heartbeat
     bool     streamEnabled_     = false;

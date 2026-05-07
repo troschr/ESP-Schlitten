@@ -2,6 +2,8 @@
 #include "config/Config.h"
 #include <Wire.h>
 
+namespace esp_schlitten {
+
 void SensorManager::begin() {
     // VL53L0X init
     _vl53.setTimeout(500);
@@ -43,3 +45,5 @@ bool SensorManager::readObstacleCm(uint16_t &distCm, uint16_t &amplitude) {
     amplitude = (uint16_t)b[2] | ((uint16_t)b[3] << 8);
     return true;
 }
+
+}  // namespace esp_schlitten

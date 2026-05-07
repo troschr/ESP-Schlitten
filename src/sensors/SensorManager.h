@@ -5,6 +5,8 @@
 // Wrapper für VL53L0X (Türsensor) und TF-Luna (Hindernissensor, I2C).
 // Wire.begin() muss vor begin() aufgerufen worden sein.
 
+namespace esp_schlitten {
+
 class SensorManager {
 public:
     void begin();
@@ -24,3 +26,5 @@ private:
     bool    _vl53Ok    = false;
     bool    _tfLunaOk  = false;
 };
+
+}  // namespace esp_schlitten

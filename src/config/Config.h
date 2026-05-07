@@ -65,11 +65,12 @@ namespace Timing {
 
 // ─── Sensoren ─────────────────────────────────────────────────────────────────
 namespace Sensor {
-    constexpr uint16_t DOOR_OPEN_MM     = 200;    // VL53L0X: unter diesem Wert = Tür offen
-    constexpr uint16_t OBSTACLE_STOP_MM = 60;     // TF-Luna: Stopp-Abstand
-    constexpr uint16_t OBSTACLE_WARN_MM = 120;    // TF-Luna: Warnabstand
-    constexpr uint16_t TFLUNA_AMP_MIN   = 100;    // Mindestsignalstärke TF-Luna
-    constexpr uint8_t  TFLUNA_ADDR      = 0x10;
+    constexpr uint16_t DOOR_OPEN_MM          = 200;  // VL53L0X: unter diesem Wert = Tür offen
+    constexpr uint16_t OBSTACLE_STOP_MM      = 60;   // TF-Luna: Stopp-Abstand
+    constexpr uint16_t OBSTACLE_WARN_MM      = 120;  // TF-Luna: Warnabstand
+    constexpr uint16_t TFLUNA_AMP_MIN        = 100;  // Mindestsignalstärke TF-Luna
+    constexpr uint8_t  TFLUNA_ADDR           = 0x10;
+    constexpr uint8_t  MAX_OBSTACLE_FAULTS   = 3;    // aufeinanderfolgende I2C-Fehler bis Notstopp
 }
 
 }  // namespace Config

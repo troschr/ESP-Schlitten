@@ -5,6 +5,8 @@
 // Ansteuerung in Schritten; keine Positionsregelung.
 // update() muss jeden Loop-Durchlauf aufgerufen werden.
 
+namespace esp_schlitten {
+
 class DrvActuator {
 public:
     DrvActuator(uint8_t pinStep, uint8_t pinDir, uint8_t pinEn,
@@ -33,3 +35,5 @@ private:
     bool     _moving       = false;
     uint32_t _nextStepUs   = 0;
 };
+
+}  // namespace esp_schlitten

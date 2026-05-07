@@ -301,8 +301,8 @@ void AppController::updateHoming() {
         current_    = Position{};
         target_     = Position{};
         referenced_ = true;
-        setState(AppState::Ready);
         reporter_.sendOk(pendingHomeCmdId_, "HOME_DONE", motionSnapshot());
+        setState(AppState::Ready);
     }
 }
 
@@ -356,8 +356,8 @@ void AppController::updateMoveHome() {
     if (xHomed_ && zHomed_) {
         current_ = Position{};
         target_  = Position{};
-        setState(AppState::Ready);
         reporter_.sendOk(pendingMoveHomeCmdId_, "MOVE_HOME_DONE", motionSnapshot());
+        setState(AppState::Ready);
     }
 }
 
@@ -385,21 +385,25 @@ void AppController::updateMoving() {
     if (xDone && zDone) {
         current_.x_mm = (int32_t)axisX_.positionMm();
         current_.z_mm = (int32_t)axisZ_.positionMm();
-        setState(AppState::Ready);
         reporter_.sendOk(pendingMoveCmdId_, "MOVE_DONE", motionSnapshot());
+        setState(AppState::Ready);
     }
 }
 
 void AppController::checkObstacleSensor() {
-    if (!sensors_.isObstacleSensorOk()) {
-        cachedSensors_.obstacleOk = false;
-        return;
-    }
     uint16_t cm, amp;
-    if (!sensors_.readObstacleCm(cm, amp)) {
-        cachedSensors_.obstacleOk = false;
+    const bool readOk = sensors_.isObstacleSensorOk() && sensors_.readObstacleCm(cm, amp);
+
+    if (!readOk) {
+        if (++obstacleFaultCount_ >= Config::Sensor::MAX_OBSTACLE_FAULTS) {
+            axisX_.stop();
+            axisZ_.stop();
+            enterError(ErrorCode::SensorFaultObstacle);
+        }
         return;
     }
+
+    obstacleFaultCount_ = 0;
     const uint16_t mm = cm * 10;
     cachedSensors_.obstacleOk = (mm >= Config::Sensor::OBSTACLE_STOP_MM);
 
@@ -428,8 +432,8 @@ void AppController::setState(AppState next) {
 
 void AppController::enterError(ErrorCode error) {
     error_ = error;
-    setState(AppState::Error);
     reporter_.sendError(error, motionSnapshot());
+    setState(AppState::Error);
     publishStatus();
 }
 

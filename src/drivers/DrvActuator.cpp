@@ -1,6 +1,8 @@
 #include "drivers/DrvActuator.h"
 #include <Arduino.h>
 
+namespace esp_schlitten {
+
 DrvActuator::DrvActuator(uint8_t pinStep, uint8_t pinDir, uint8_t pinEn,
                           uint32_t stepPulseUs, uint32_t dirSetupUs, uint32_t stepDelayUs)
     : _pinStep(pinStep), _pinDir(pinDir), _pinEn(pinEn)
@@ -57,3 +59,5 @@ void DrvActuator::stop() {
     _stepsLeft = 0;
     digitalWrite(_pinEn, HIGH);
 }
+
+}  // namespace esp_schlitten

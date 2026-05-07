@@ -1,5 +1,8 @@
 #include "drivers/ClMotor.h"
+#include "config/Config.h"
 #include <Arduino.h>
+
+namespace esp_schlitten {
 
 ClMotor::ClMotor(uint8_t pinStep, uint8_t pinDir, uint8_t pinEn, uint8_t pinAlm,
                  float stepsPerMm, uint32_t stepsPerRev,
@@ -10,11 +13,17 @@ ClMotor::ClMotor(uint8_t pinStep, uint8_t pinDir, uint8_t pinEn, uint8_t pinAlm,
     , _stepPulseUs(stepPulseUs), _dirSetupUs(dirSetupUs)
     , _dfltAccelSteps(accelSteps)
 {
+    static_assert(Config::MotionX::MAX_RPM   > 0, "MAX_RPM muss > 0 sein");
+    static_assert(Config::MotionX::START_RPM > 0, "START_RPM muss > 0 sein");
+    static_assert(Config::MotionZ::MAX_RPM   > 0, "MAX_RPM muss > 0 sein");
+    static_assert(Config::MotionZ::START_RPM > 0, "START_RPM muss > 0 sein");
+
     _dfltHalfUsCruise = rpmToHalfUs(maxRpm);
     _dfltHalfUsStart  = rpmToHalfUs(startRpm);
 }
 
 uint32_t ClMotor::rpmToHalfUs(uint16_t rpm) const {
+    if (rpm == 0) return 0xFFFFFFFFUL;
     return 30000000UL / ((uint32_t)rpm * _stepsPerRev);
 }
 
@@ -134,3 +143,5 @@ uint32_t ClMotor::trapezDelay() const {
     const float inv = (1.0f / _halfUsStart) + t * (1.0f / _halfUsCruise - 1.0f / _halfUsStart);
     return (uint32_t)(1.0f / inv);
 }
+
+}  // namespace esp_schlitten
