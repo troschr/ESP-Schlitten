@@ -191,7 +191,7 @@ void AppController::handleMoveTo(const Command &cmd) {
 
     if (current_.x_mm == 0 && current_.z_mm == 0) {
         scanStartMs_ = millis();
-        axisZ_.moveTo(Config::MotionZ::MAX_TRAVEL_MM);
+        scanPhase_   = 0;
         setState(AppState::BusyScanning);
     } else {
         moveStartMs_ = millis();
@@ -312,25 +312,44 @@ void AppController::updateScanning() {
     checkDriverAlarms();
     if (state_ != AppState::BusyScanning) return;
 
-    const uint32_t now = millis();
-    if ((now - lastSensorPollMs_) >= Config::Timing::SENSOR_POLL_MS) {
-        lastSensorPollMs_ = now;
-        checkObstacleSensor(Config::Sensor::SCAN_OBSTACLE_STOP_MM);
-        if (state_ != AppState::BusyScanning) return;
-    }
-
-    if ((now - scanStartMs_) > Config::Timing::MOVE_TIMEOUT_MS) {
+    if ((millis() - scanStartMs_) > Config::Timing::MOVE_TIMEOUT_MS) {
         axisZ_.stop();
         enterError(ErrorCode::MoveTimeout);
         return;
     }
 
-    if (zDone) {
-        moveStartMs_ = millis();
-        axisX_.moveTo((float)target_.x_mm);
-        axisZ_.moveTo((float)target_.z_mm);
-        setState(AppState::BusyMoving);
+    if (scanPhase_ == 0) {
+        // Messung in Home-Position
+        uint16_t cm, amp;
+        if (!sensors_.isObstacleSensorOk() || !sensors_.readObstacleCm(cm, amp)) {
+            enterError(ErrorCode::SensorFaultObstacle);
+            return;
+        }
+        if ((uint32_t)cm * 10 < Config::Sensor::SCAN_OBSTACLE_STOP_MM) {
+            enterError(ErrorCode::ObstacleDetected);
+            return;
+        }
+        axisZ_.moveTo(Config::MotionZ::SCAN_Z_PROBE_MM);
+        scanPhase_ = 1;
+        return;
     }
+
+    if (!zDone) return;
+
+    // Phase 1 abgeschlossen: Z auf 200 mm – zweite Messung
+    uint16_t cm, amp;
+    if (!sensors_.isObstacleSensorOk() || !sensors_.readObstacleCm(cm, amp)) {
+        enterError(ErrorCode::SensorFaultObstacle);
+        return;
+    }
+    if ((uint32_t)cm * 10 < Config::Sensor::SCAN_OBSTACLE_STOP_MM) {
+        enterError(ErrorCode::ObstacleDetected);
+        return;
+    }
+    moveStartMs_ = millis();
+    axisX_.moveTo((float)target_.x_mm);
+    axisZ_.moveTo((float)target_.z_mm);
+    setState(AppState::BusyMoving);
 }
 
 void AppController::updateMoveHome() {
@@ -369,12 +388,6 @@ void AppController::updateMoving() {
     if (state_ != AppState::BusyMoving) return;
 
     const uint32_t now = millis();
-    if ((now - lastSensorPollMs_) >= Config::Timing::SENSOR_POLL_MS) {
-        lastSensorPollMs_ = now;
-        checkObstacleSensor();
-        if (state_ != AppState::BusyMoving) return;
-    }
-
     if ((now - moveStartMs_) > Config::Timing::MOVE_TIMEOUT_MS) {
         axisX_.stop();
         axisZ_.stop();
@@ -387,30 +400,6 @@ void AppController::updateMoving() {
         current_.z_mm = (int32_t)axisZ_.positionMm();
         reporter_.sendOk(pendingMoveCmdId_, "MOVE_DONE", motionSnapshot());
         setState(AppState::Ready);
-    }
-}
-
-void AppController::checkObstacleSensor(uint16_t stopMm) {
-    uint16_t cm, amp;
-    const bool readOk = sensors_.isObstacleSensorOk() && sensors_.readObstacleCm(cm, amp);
-
-    if (!readOk) {
-        if (++obstacleFaultCount_ >= Config::Sensor::MAX_OBSTACLE_FAULTS) {
-            axisX_.stop();
-            axisZ_.stop();
-            enterError(ErrorCode::SensorFaultObstacle);
-        }
-        return;
-    }
-
-    obstacleFaultCount_ = 0;
-    const uint16_t mm = cm * 10;
-    cachedSensors_.obstacleOk = (mm >= stopMm);
-
-    if (!cachedSensors_.obstacleOk) {
-        axisX_.stop();
-        axisZ_.stop();
-        enterError(ErrorCode::ObstacleDetected);
     }
 }
 

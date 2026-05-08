@@ -40,7 +40,6 @@ private:
     void updateScanning();
     void updateMoving();
     void updateMoveHome();
-    void checkObstacleSensor(uint16_t stopMm = Config::Sensor::OBSTACLE_STOP_MM);
     void checkDriverAlarms();
 
     // ── Zustandsmaschine ─────────────────────────────────────────────────────
@@ -82,6 +81,7 @@ private:
 
     // Scanning
     uint32_t scanStartMs_         = 0;
+    uint8_t  scanPhase_           = 0;  // 0 = Messung Home, 1 = Z fährt auf 200mm, Messung folgt
 
     // Moving
     uint32_t moveStartMs_         = 0;
@@ -89,8 +89,6 @@ private:
 
     // Sensoren (gecacht)
     SensorSnapshot cachedSensors_;
-    uint32_t       lastSensorPollMs_      = 0;
-    uint8_t        obstacleFaultCount_    = 0;
 
     // Streaming / Heartbeat
     bool     streamEnabled_     = false;

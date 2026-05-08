@@ -33,7 +33,8 @@ namespace MotionZ {
     constexpr uint32_t STEP_US        = 3;
     constexpr uint32_t DIR_US         = 5;
     constexpr bool     HOMING_FORWARD = false;
-    constexpr float    MAX_TRAVEL_MM  = 500.0f;  // maximale Z-Verfahrlänge für Scan
+    constexpr float    MAX_TRAVEL_MM   = 500.0f;   // maximale Z-Verfahrlänge
+    constexpr float    SCAN_Z_PROBE_MM = 200.0f;   // Z-Position der zweiten TF-Luna-Messung beim Scan
 }
 
 // ─── DRV8825 Greifer ──────────────────────────────────────────────────────────
