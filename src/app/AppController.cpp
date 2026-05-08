@@ -315,7 +315,7 @@ void AppController::updateScanning() {
     const uint32_t now = millis();
     if ((now - lastSensorPollMs_) >= Config::Timing::SENSOR_POLL_MS) {
         lastSensorPollMs_ = now;
-        checkObstacleSensor();
+        checkObstacleSensor(Config::Sensor::SCAN_OBSTACLE_STOP_MM);
         if (state_ != AppState::BusyScanning) return;
     }
 
@@ -390,7 +390,7 @@ void AppController::updateMoving() {
     }
 }
 
-void AppController::checkObstacleSensor() {
+void AppController::checkObstacleSensor(uint16_t stopMm) {
     uint16_t cm, amp;
     const bool readOk = sensors_.isObstacleSensorOk() && sensors_.readObstacleCm(cm, amp);
 
@@ -405,7 +405,7 @@ void AppController::checkObstacleSensor() {
 
     obstacleFaultCount_ = 0;
     const uint16_t mm = cm * 10;
-    cachedSensors_.obstacleOk = (mm >= Config::Sensor::OBSTACLE_STOP_MM);
+    cachedSensors_.obstacleOk = (mm >= stopMm);
 
     if (!cachedSensors_.obstacleOk) {
         axisX_.stop();

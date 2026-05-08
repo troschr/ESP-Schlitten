@@ -58,16 +58,17 @@ namespace DoorArm {
 namespace Timing {
     constexpr uint32_t HEARTBEAT_MS    = 1000;
     constexpr uint32_t STREAM_MS       = 100;
-    constexpr uint32_t MOVE_TIMEOUT_MS = 20000;
-    constexpr uint32_t HOME_TIMEOUT_MS = 15000;
+    constexpr uint32_t MOVE_TIMEOUT_MS = 100000;
+    constexpr uint32_t HOME_TIMEOUT_MS = 35000;
     constexpr uint32_t SENSOR_POLL_MS  = 50;      // Hindernissensor-Abfrageintervall während Fahrt
 }
 
 // ─── Sensoren ─────────────────────────────────────────────────────────────────
 namespace Sensor {
     constexpr uint16_t DOOR_OPEN_MM          = 200;  // VL53L0X: unter diesem Wert = Tür offen
-    constexpr uint16_t OBSTACLE_STOP_MM      = 60;   // TF-Luna: Stopp-Abstand
+    constexpr uint16_t OBSTACLE_STOP_MM      = 60;   // TF-Luna: Stopp-Abstand (Normalbetrieb)
     constexpr uint16_t OBSTACLE_WARN_MM      = 120;  // TF-Luna: Warnabstand
+    constexpr uint16_t SCAN_OBSTACLE_STOP_MM = 1000; // TF-Luna: Stopp-Abstand während Scanfahrt
     constexpr uint16_t TFLUNA_AMP_MIN        = 100;  // Mindestsignalstärke TF-Luna
     constexpr uint8_t  TFLUNA_ADDR           = 0x10;
     constexpr uint8_t  MAX_OBSTACLE_FAULTS   = 3;    // aufeinanderfolgende I2C-Fehler bis Notstopp

@@ -40,7 +40,7 @@ private:
     void updateScanning();
     void updateMoving();
     void updateMoveHome();
-    void checkObstacleSensor();
+    void checkObstacleSensor(uint16_t stopMm = Config::Sensor::OBSTACLE_STOP_MM);
     void checkDriverAlarms();
 
     // ── Zustandsmaschine ─────────────────────────────────────────────────────
