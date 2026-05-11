@@ -281,8 +281,10 @@ void AppController::updateHoming() {
     if (!xHomed_) {
         axisX_.update();
     } else if (!homingZStarted_) {
-        axisZ_.startHoming(Config::MotionZ::HOMING_FORWARD, Config::MotionZ::HOMING_RPM);
         homingZStarted_ = true;
+        if (!zHomed_) {
+            axisZ_.startHoming(Config::MotionZ::HOMING_FORWARD, Config::MotionZ::HOMING_RPM);
+        }
     } else {
         axisZ_.update();
     }
@@ -298,6 +300,7 @@ void AppController::updateHoming() {
     }
 
     if (xHomed_ && zHomed_) {
+        axisZ_.stop();
         current_    = Position{};
         target_     = Position{};
         referenced_ = true;
@@ -356,8 +359,10 @@ void AppController::updateMoveHome() {
     if (!xHomed_) {
         axisX_.update();
     } else if (!homingZStarted_) {
-        axisZ_.startHoming(Config::MotionZ::HOMING_FORWARD, Config::MotionZ::HOMING_RPM);
         homingZStarted_ = true;
+        if (!zHomed_) {
+            axisZ_.startHoming(Config::MotionZ::HOMING_FORWARD, Config::MotionZ::HOMING_RPM);
+        }
     } else {
         axisZ_.update();
     }
@@ -373,6 +378,7 @@ void AppController::updateMoveHome() {
     }
 
     if (xHomed_ && zHomed_) {
+        axisZ_.stop();
         current_ = Position{};
         target_  = Position{};
         reporter_.sendOk(pendingMoveHomeCmdId_, "MOVE_HOME_DONE", motionSnapshot());
