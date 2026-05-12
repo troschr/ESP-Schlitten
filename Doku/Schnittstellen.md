@@ -43,8 +43,9 @@ CMD;<id>;<befehl>[;<key>=<value>...]
 | MOVE_TO | `CMD;<id>;MOVE_TO;x=<mm>;z=<mm>` | `READY` oder `STOPPED`, referenziert | ✅ |
 | RESET_ERROR | `CMD;<id>;RESET_ERROR` | nur in `ERROR` | ✅ |
 | HOME_SWITCH_HIT | `CMD;<id>;HOME_SWITCH_HIT;axis=<X\|Z>` | nur in `BUSY_HOMING` oder `BUSY_MOVE_HOME` | ✅ |
-| SET_CLAMP | `CMD;<id>;SET_CLAMP;position=<OPEN\|CLOSED\|SERVICE>` | nicht `ERROR`, nicht busy | ⚠️ |
 | SET_DOOR_ARM | `CMD;<id>;SET_DOOR_ARM;position=<OPEN\|CLOSED>` | nicht `ERROR`, nicht busy | ⚠️ |
+| PICKUP | `CMD;<id>;PICKUP;gripper_depth=<mm>;lift_offset=<mm>` | `READY` oder `STOPPED`, referenziert | ✅ |
+| DEPOSIT | `CMD;<id>;DEPOSIT;gripper_depth=<mm>;lift_offset=<mm>` | `READY` oder `STOPPED`, referenziert | ✅ |
 
 ---
 
@@ -65,6 +66,58 @@ CMD;2;HOME_SWITCH_HIT;axis=X
 
 > Die Schlitten-Endschalter (X, Z) sind am Raspberry Pi angeschlossen – der Pi kennt sie direkt und ist verantwortlich, das Signal unverzüglich weiterzuleiten.  
 > Greifer- und Türarm-Endschalter sitzen auf dem Schlitten und sind am ESP angeschlossen – der ESP wertet sie intern aus, kein `HOME_SWITCH_HIT` nötig.
+
+**Homing-Ablauf beim HOME-Kommando:**  
+Der ESP homt alle vier Motoren parallel bzw. überlappend:
+- X-Achse fährt Richtung Endschalter → stoppt bei `HOME_SWITCH_HIT;axis=X` vom Pi
+- Wenn X fertig: Z-Achse fährt Richtung Endschalter → stoppt bei `HOME_SWITCH_HIT;axis=Z` vom Pi
+- Greifer fährt in negativer Richtung bis Endschalter am ESP ausgelöst → stoppt intern
+- Türarm fährt in negativer Richtung bis Endschalter am ESP ausgelöst → stoppt intern
+
+`HOME_DONE` wird erst gesendet, wenn **alle vier** Motoren referenziert sind.
+
+---
+
+### ✅ Parameter PICKUP
+
+Der Schlitten steht bereits auf der Zielposition (direkt vor dem Drucker/Stellplatz). Die gespeicherte Position ist die „Gabel-unter-Platte"-Bereitschaftsposition – d.h. der Greifer kann auf dieser Höhe direkt einfahren.
+
+**Ablauf (ESP-intern):**
+1. Greifer fährt aus (`gripper_depth` mm)
+2. Schlitten hebt um `lift_offset` mm nach oben → Platte liegt auf der Gabel
+3. Greifer fährt ein → Schlitten bereit zum Weiterfahren
+
+| Feld | Typ | Pflicht | Bedeutung |
+|---|---|---|---|
+| `gripper_depth` | int (mm) | ja | Wie weit der Greifer ausfährt (druckerspezifisch) |
+| `lift_offset` | int (mm) | ja | Wie weit der Schlitten nach dem Ausfahren anhebt, um die Platte aufzunehmen |
+
+Beispiel:
+```
+CMD;5;PICKUP;gripper_depth=120;lift_offset=8
+```
+
+---
+
+### ✅ Parameter DEPOSIT
+
+Der Schlitten steht bereits auf der Zielposition (direkt vor Drucker/Stellplatz), trägt eine Platte. Die gespeicherte Position ist die „Gabel-unter-Platte"-Bereitschaftsposition – d.h. der Schlitten muss erst anheben, damit die Platte über dem Stellplatz liegt, bevor er den Greifer ausfährt.
+
+**Ablauf (ESP-intern):**
+1. Schlitten hebt um `lift_offset` mm nach oben → Platte schwebt über Stellfläche
+2. Greifer fährt aus (`gripper_depth` mm) → Platte wird positioniert
+3. Schlitten senkt um `lift_offset` mm → Platte liegt auf
+4. Greifer fährt ein
+
+| Feld | Typ | Pflicht | Bedeutung |
+|---|---|---|---|
+| `gripper_depth` | int (mm) | ja | Wie weit der Greifer ausfährt (zielspezifisch) |
+| `lift_offset` | int (mm) | ja | Wie weit der Schlitten zunächst anhebt, um die Platte über der Stellfläche zu positionieren |
+
+Beispiel:
+```
+CMD;6;DEPOSIT;gripper_depth=120;lift_offset=8
+```
 
 ---
 
@@ -123,18 +176,6 @@ Der typische Ablauf am Drucker (vorläufig):
 
 ---
 
-### ⚠️ Parameter SET_CLAMP (Halteservo)
-
-> **Status: noch offen** – Ob der Schlitten eine Klemmvorrichtung bekommt, wie sie ausgeführt wird (Servo, Pneumatik, Magnet o.ä.) und ob sie direkt per Kommando oder implizit durch einen ESP-internen Ablauf gesteuert wird, ist noch nicht entschieden.
-
-| Wert | Pulsbreite (vorläufig) | Bedeutung |
-|---|---|---|
-| `OPEN` | 2000 µs | Plattenhalter geöffnet |
-| `CLOSED` | 1000 µs | Plattenhalter geschlossen |
-| `SERVICE` | 1500 µs | Mittelstellung für Wartung |
-
----
-
 ## ✅ ESP → Pi: Antworten
 
 ### RSP – Sofortantwort auf ein Kommando
@@ -175,11 +216,10 @@ EVT;0;HEARTBEAT;uptime_ms=<ms>;state=<zustandscode>;x=<mm>;z=<mm>
 | `ERROR_RESET` | RESET_ERROR ausgeführt | ✅ |
 | `STREAM_ON` | Stream eingeschaltet | ✅ |
 | `STREAM_OFF` | Stream ausgeschaltet | ✅ |
-| `CLAMP_OPEN` | Halteservo geöffnet (Platte freigegeben) | ⚠️ |
-| `CLAMP_CLOSED` | Halteservo geschlossen (Platte geklemmt) | ⚠️ |
-| `CLAMP_SERVICE` | Halteservo in Mittelstellung | ⚠️ |
 | `DOOR_ARM_OPEN` | Türarm ausgefahren | ⚠️ |
 | `DOOR_ARM_CLOSED` | Türarm eingefahren | ⚠️ |
+| `PICKUP_DONE` | Plattenentnahme abgeschlossen | ✅ |
+| `DEPOSIT_DONE` | Plattenablage abgeschlossen | ✅ |
 
 #### ✅ EVT STATE – Zustandsübergang
 
@@ -204,6 +244,7 @@ Auf `CMD;<id>;STATUS`, bei jedem Eintritt in `ERROR` und periodisch wenn Stream 
 | `obstacle_ok` | `1` = Hindernissensor gesund und frei | ✅ |
 | `door_open` | `1` = Tür offen (Entscheidung trifft der ESP intern) | ✅ |
 | `door_dist_mm` | Rohwert des Türsensors in mm (für Debugging; nur valide wenn Schlitten an Druckerposition steht) | ✅ |
+| `plate_detected` | `1` = Plattenerkennungs-Taster ausgelöst (Platte liegt auf Gabel) | ✅ |
 
 #### ✅ EVT ERR – Fehler
 
@@ -226,6 +267,8 @@ Wird alle 1000 ms gesendet.
 | `BUSY_SCANNING` | Z-Scan vor Fahrt aus Home-Position läuft |
 | `BUSY_MOVING` | Fahrt zu Zielposition läuft |
 | `BUSY_MOVE_HOME` | Rückfahrt zur Home-Position läuft |
+| `BUSY_PICKUP` | Plattenentnahme läuft (Greifer ausfahren → anheben → einfahren) |
+| `BUSY_DEPOSIT` | Plattenablage läuft (anheben → Greifer ausfahren → absenken → einfahren) |
 | `STOPPED` | Bewegung per STOP angehalten |
 | `ERROR` | Fehler, alle Motoren gestoppt, wartet auf RESET_ERROR |
 
@@ -246,6 +289,8 @@ Wird alle 1000 ms gesendet.
 | `SENSOR_FAULT_OBSTACLE` | Hindernissensor ausgefallen oder nicht initialisierbar |
 | `SENSOR_FAULT_GRIPPER` | Greifer-Taster antwortet nicht erwartungsgemäß |
 | `DRIVER_FAULT` | Stepper-Treiber meldet Fehler |
+| `PLATE_NOT_DETECTED` | Nach dem Z-Anheben beim PICKUP hat der Plattenerkennungs-Taster nicht ausgelöst – keine Platte aufgenommen |
+| `DOOR_NOT_OPEN` | Türsensor meldet zu geringe Distanz vor PICKUP oder DEPOSIT – Kommando abgelehnt, kein Motor gestartet |
 
 ---
 
@@ -270,8 +315,16 @@ Wird alle 1000 ms gesendet.
              │                                        │ [MOVE_DONE]
              │                                        └───────────────► READY
              │
-             └──[MOVE_HOME]──────────────────► BUSY_MOVE_HOME ──[Fehler / Timeout]──► ERROR
-                                                     │ [MOVE_HOME_DONE]
+             ├──[MOVE_HOME]──────────────────► BUSY_MOVE_HOME ──[Fehler / Timeout]──► ERROR
+             │                                       │ [MOVE_HOME_DONE]
+             │                                       └──────────────────────────► READY
+             │
+             ├──[PICKUP]──────────────────────► BUSY_PICKUP ──[Fehler]──────────► ERROR
+             │                                       │ [PICKUP_DONE]
+             │                                       └──────────────────────────► READY
+             │
+             └──[DEPOSIT]─────────────────────► BUSY_DEPOSIT ──[Fehler]─────────► ERROR
+                                                     │ [DEPOSIT_DONE]
                                                      └──────────────────────────► READY
 ```
 
@@ -301,15 +354,18 @@ Greifer- und Türarm-Endschalter wertet der ESP intern aus – kein Kommando nö
 → CMD;1;HOME
 ← RSP;1;ACK
 ← EVT;0;STATE;BUSY_HOMING;ref=0;x=0;z=0
-  [ESP fährt X-Achse in Richtung Endschalter]
+  [ESP fährt X-Achse Richtung Endschalter]
+  [ESP fährt Greifer und Türarm gleichzeitig in neg. Richtung Richtung Endschalter]
   [Pi erkennt X-Endschalter an GPIO]
 → CMD;2;HOME_SWITCH_HIT;axis=X
 ← RSP;2;ACK
   [ESP stoppt X-Motor, setzt X=0 mm]
   [ESP fährt Z-Achse in Richtung Endschalter]
+  [Greifer/Türarm-Endschalter werden intern ausgewertet, kein Kommando nötig]
   [Pi erkennt Z-Endschalter an GPIO]
 → CMD;3;HOME_SWITCH_HIT;axis=Z
 ← RSP;3;ACK
+  [ESP wartet bis auch Greifer und Türarm ihre Endschalter erreicht haben]
 ← EVT;1;OK;HOME_DONE;x=0;z=0
 ← EVT;0;STATE;READY;ref=1;x=0;z=0
 ```
@@ -357,6 +413,39 @@ Wenn der Schlitten an der Home-Position steht (x=0, z=0), fährt der ESP zuerst 
 ← EVT;0;STATE;READY;ref=1;x=0;z=0
 ```
 
+### Plattenentnahme (PICKUP)
+
+Schlitten steht bereits auf der Zielposition vor dem Drucker (READY). Tür wurde vorab geprüft und ist offen.
+
+```
+→ CMD;5;PICKUP;gripper_depth=120;lift_offset=8
+← RSP;5;ACK
+← EVT;0;STATE;BUSY_PICKUP;ref=1;x=350;z=120
+  [ESP fährt Greifer 120 mm aus]
+  [ESP hebt Z-Achse um 8 mm → Platte sitzt auf der Gabel]
+  [ESP fährt Greifer ein]
+← EVT;5;OK;PICKUP_DONE;x=350;z=128
+← EVT;0;STATE;READY;ref=1;x=350;z=128
+```
+
+### Plattenablage (DEPOSIT)
+
+Schlitten steht auf Zielposition (Stellplatz oder Drucker), trägt eine Platte.
+
+```
+→ CMD;6;DEPOSIT;gripper_depth=120;lift_offset=8
+← RSP;6;ACK
+← EVT;0;STATE;BUSY_DEPOSIT;ref=1;x=500;z=128
+  [ESP hebt Z-Achse um 8 mm → Platte über Stellfläche]
+  [ESP fährt Greifer 120 mm aus]
+  [ESP senkt Z-Achse um 8 mm → Platte liegt auf]
+  [ESP fährt Greifer ein]
+← EVT;6;OK;DEPOSIT_DONE;x=500;z=120
+← EVT;0;STATE;READY;ref=1;x=500;z=120
+```
+
+---
+
 ### Türprüfung nach Anfahren
 
 ```
@@ -399,8 +488,9 @@ Wenn der Schlitten an der Home-Position steht (x=0, z=0), fährt der ESP zuerst 
 - Zweck: Prüfen ob die Druckertür wirklich geöffnet ist
 - Der ESP trifft die Entscheidung „Tür offen ja/nein" selbst anhand eines internen Schwellwerts
 - Im STATUS-Feld `door_open` liefert der ESP das Ergebnis als Boolean; `door_dist_mm` ist zusätzlich als Rohwert für Debugging enthalten
+- Vor jedem PICKUP und DEPOSIT liest der ESP einen frischen Messwert und prüft, ob die Distanz **größer als `DOOR_ENTRY_CLEARANCE_MM`** ist. Ist sie es nicht, wird das Kommando mit `RSP;<id>;ERR;DOOR_NOT_OPEN` abgelehnt – kein Motor startet.
 
-> ⚠️ **Noch offen:** Schwellwert – intern im ESP, noch zu bestätigen (~200 mm)
+> ⚠️ **Noch offen:** Schwellwert `door_open` – intern im ESP, noch zu bestätigen (~200 mm)
 
 ### ✅ Hindernissensor (Fahrtrichtung) – TF-Luna LiDAR
 
@@ -413,6 +503,14 @@ Wenn der Schlitten an der Home-Position steht (x=0, z=0), fährt der ESP zuerst 
 - Löst bei Unterschreitung des Stoppabstands sofort `ERROR;OBSTACLE` aus
 
 > ⚠️ **Noch offen:** Montageposition am Schlitten, Stoppabstand und Warnabstand in mm, I2C-Adresse (Default: 0x10)
+
+### ✅ Plattenerkennungs-Taster
+
+- Sitzt auf dem Schlitten, wird von der Druckplatte betätigt wenn sie auf der Gabel aufliegt
+- GPIO 34, Hardware-Pullup extern, active-low (LOW = Platte erkannt)
+- Wird **nach Phase 1 von PICKUP** ausgewertet (nach dem Z-Anheben)
+- Ist der Taster nicht ausgelöst: ESP bricht mit `ERROR;PLATE_NOT_DETECTED` ab, Greifer bleibt ausgefahren
+- Im STATUS-Feld `plate_detected` jederzeit ablesbar
 
 ---
 
@@ -477,12 +575,13 @@ Der CL42T regelt Positions-Folgefehler selbst. Übersteigt der Fehler den intern
 | Schritte/mm (X-Achse) | noch offen | ⚠️ |
 | Schritte/mm (Z-Achse) | noch offen | ⚠️ |
 | Türsensor Schwelle „offen" | ~200 mm | ⚠️ noch zu bestätigen |
+| Türsensor Freigabe-Schwelle (Greifer-Einfahrt) | 300 mm | ⚠️ noch zu bestätigen |
 | Heartbeat-Intervall | 1000 ms | ✅ |
 | Stream-Intervall | 100 ms | ✅ |
 | Hindernissensor Abfrageintervall | 50 ms | ✅ |
 | Hindernissensor Stoppabstand | noch offen | ⚠️ |
 | Hindernissensor Warnabstand | noch offen | ⚠️ |
-| Homing-Timeout | 15.000 ms | ✅ |
+| Homing-Timeout | 35.000 ms | ✅ |
 | Bewegungs-Timeout | 20.000 ms | ✅ |
 | Positionstoleranz | noch festzulegen | ⚠️ |
 

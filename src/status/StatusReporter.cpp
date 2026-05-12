@@ -29,7 +29,8 @@ void StatusReporter::sendStatus(const StatusSnapshot &s) {
     ";door_arm_home="                + (s.sensors.doorArmHome ? "1" : "0") +
     ";obstacle_ok="                  + (s.sensors.obstacleOk ? "1" : "0") +
     ";door_open="                    + (s.sensors.doorOpen ? "1" : "0") +
-    ";door_dist_mm="                 + s.sensors.doorDistanceMm);
+    ";door_dist_mm="                 + s.sensors.doorDistanceMm +
+    ";plate_detected="               + (s.sensors.plateDetected ? "1" : "0"));
 }
 
 void StatusReporter::sendOk(uint32_t id, const char *eventName, const MotionSnapshot &motion) {

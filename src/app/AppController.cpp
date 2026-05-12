@@ -46,6 +46,8 @@ void AppController::update() {
         case AppState::BusyScanning: updateScanning(); break;
         case AppState::BusyMoving:   updateMoving();   break;
         case AppState::BusyMoveHome: updateMoveHome(); break;
+        case AppState::BusyPickup:   updatePickup();   break;
+        case AppState::BusyDeposit:  updateDeposit();  break;
         default: break;
     }
 
@@ -97,8 +99,9 @@ void AppController::dispatchCommand(const Command &cmd) {
         case CommandType::MoveTo:        handleMoveTo(cmd);        return;
         case CommandType::MoveHome:      handleMoveHome(cmd);      return;
         case CommandType::ResetError:    handleResetError(cmd);    return;
-        case CommandType::SetClamp:      handleSetClamp(cmd);      return;
         case CommandType::SetDoorArm:    handleSetDoorArm(cmd);    return;
+        case CommandType::Pickup:        handlePickup(cmd);        return;
+        case CommandType::Deposit:       handleDeposit(cmd);       return;
         default:
             comm_.sendResponseError(cmd.id, ErrorCode::InvalidCommand);
     }
@@ -129,8 +132,9 @@ void AppController::handleHome(const Command &cmd) {
         comm_.sendResponseError(cmd.id, ErrorCode::InvalidState);
         return;
     }
-    if (state_ == AppState::BusyHoming || state_ == AppState::BusyMoving ||
-        state_ == AppState::BusyScanning || state_ == AppState::BusyMoveHome) {
+    if (state_ == AppState::BusyHoming   || state_ == AppState::BusyMoving  ||
+        state_ == AppState::BusyScanning || state_ == AppState::BusyMoveHome ||
+        state_ == AppState::BusyPickup   || state_ == AppState::BusyDeposit) {
         comm_.sendResponseError(cmd.id, ErrorCode::Busy);
         return;
     }
@@ -139,6 +143,8 @@ void AppController::handleHome(const Command &cmd) {
 
     xHomed_           = false;
     zHomed_           = false;
+    gripperHomed_     = false;
+    doorArmHomed_     = false;
     homingZStarted_   = false;
     pendingHomeCmdId_ = cmd.id;
     homingStartMs_    = millis();
@@ -146,6 +152,8 @@ void AppController::handleHome(const Command &cmd) {
     error_            = ErrorCode::None;
 
     axisX_.startHoming(Config::MotionX::HOMING_FORWARD, Config::MotionX::HOMING_RPM);
+    gripper_.startHoming(false);
+    doorArm_.startHoming(false);
 
     setState(AppState::BusyHoming);
 }
@@ -173,8 +181,9 @@ void AppController::handleMoveTo(const Command &cmd) {
         comm_.sendResponseError(cmd.id, ErrorCode::InvalidState);
         return;
     }
-    if (state_ == AppState::BusyHoming || state_ == AppState::BusyMoving ||
-        state_ == AppState::BusyScanning || state_ == AppState::BusyMoveHome) {
+    if (state_ == AppState::BusyHoming   || state_ == AppState::BusyMoving  ||
+        state_ == AppState::BusyScanning || state_ == AppState::BusyMoveHome ||
+        state_ == AppState::BusyPickup   || state_ == AppState::BusyDeposit) {
         comm_.sendResponseError(cmd.id, ErrorCode::Busy);
         return;
     }
@@ -206,8 +215,9 @@ void AppController::handleMoveHome(const Command &cmd) {
         comm_.sendResponseError(cmd.id, ErrorCode::InvalidState);
         return;
     }
-    if (state_ == AppState::BusyHoming || state_ == AppState::BusyMoving ||
-        state_ == AppState::BusyScanning || state_ == AppState::BusyMoveHome) {
+    if (state_ == AppState::BusyHoming   || state_ == AppState::BusyMoving  ||
+        state_ == AppState::BusyScanning || state_ == AppState::BusyMoveHome ||
+        state_ == AppState::BusyPickup   || state_ == AppState::BusyDeposit) {
         comm_.sendResponseError(cmd.id, ErrorCode::Busy);
         return;
     }
@@ -243,29 +253,14 @@ void AppController::handleResetError(const Command &cmd) {
     reporter_.sendOk(cmd.id, "ERROR_RESET", motionSnapshot());
 }
 
-void AppController::handleSetClamp(const Command &cmd) {
-    if (state_ == AppState::Error) {
-        comm_.sendResponseError(cmd.id, ErrorCode::InvalidState);
-        return;
-    }
-    if (state_ == AppState::BusyHoming || state_ == AppState::BusyMoving ||
-        state_ == AppState::BusyScanning || state_ == AppState::BusyMoveHome) {
-        comm_.sendResponseError(cmd.id, ErrorCode::Busy);
-        return;
-    }
-    comm_.sendAck(cmd.id);
-    // TODO: Greifer-Aktor ansteuern wenn Mechanismus feststeht
-    String evtName = String("CLAMP_") + toString(cmd.clampPosition);
-    reporter_.sendOk(cmd.id, evtName.c_str(), motionSnapshot());
-}
-
 void AppController::handleSetDoorArm(const Command &cmd) {
     if (state_ == AppState::Error) {
         comm_.sendResponseError(cmd.id, ErrorCode::InvalidState);
         return;
     }
-    if (state_ == AppState::BusyHoming || state_ == AppState::BusyMoving ||
-        state_ == AppState::BusyScanning || state_ == AppState::BusyMoveHome) {
+    if (state_ == AppState::BusyHoming   || state_ == AppState::BusyMoving  ||
+        state_ == AppState::BusyScanning || state_ == AppState::BusyMoveHome ||
+        state_ == AppState::BusyPickup   || state_ == AppState::BusyDeposit) {
         comm_.sendResponseError(cmd.id, ErrorCode::Busy);
         return;
     }
@@ -275,9 +270,80 @@ void AppController::handleSetDoorArm(const Command &cmd) {
     reporter_.sendOk(cmd.id, evtName.c_str(), motionSnapshot());
 }
 
+void AppController::handlePickup(const Command &cmd) {
+    if (state_ == AppState::Error) {
+        comm_.sendResponseError(cmd.id, ErrorCode::InvalidState);
+        return;
+    }
+    if (state_ == AppState::BusyHoming   || state_ == AppState::BusyMoving  ||
+        state_ == AppState::BusyScanning || state_ == AppState::BusyMoveHome ||
+        state_ == AppState::BusyPickup   || state_ == AppState::BusyDeposit) {
+        comm_.sendResponseError(cmd.id, ErrorCode::Busy);
+        return;
+    }
+    if (!referenced_) {
+        comm_.sendResponseError(cmd.id, ErrorCode::NotReferenced);
+        return;
+    }
+
+    uint16_t doorMm = 0;
+    if (!sensors_.readDoorMm(doorMm) || doorMm <= Config::Sensor::DOOR_ENTRY_CLEARANCE_MM) {
+        comm_.sendResponseError(cmd.id, ErrorCode::DoorNotOpen);
+        return;
+    }
+
+    comm_.sendAck(cmd.id);
+
+    gripperSteps_       = (int32_t)(cmd.gripperDepthMm * Config::Gripper::STEPS_PER_MM);
+    liftOffsetMm_       = cmd.liftOffsetMm;
+    actionBaseZ_        = (int32_t)axisZ_.positionMm();
+    pendingActionCmdId_ = cmd.id;
+    actionStartMs_      = millis();
+    actionPhase_        = 0;
+
+    gripper_.move(gripperSteps_);
+    setState(AppState::BusyPickup);
+}
+
+void AppController::handleDeposit(const Command &cmd) {
+    if (state_ == AppState::Error) {
+        comm_.sendResponseError(cmd.id, ErrorCode::InvalidState);
+        return;
+    }
+    if (state_ == AppState::BusyHoming   || state_ == AppState::BusyMoving  ||
+        state_ == AppState::BusyScanning || state_ == AppState::BusyMoveHome ||
+        state_ == AppState::BusyPickup   || state_ == AppState::BusyDeposit) {
+        comm_.sendResponseError(cmd.id, ErrorCode::Busy);
+        return;
+    }
+    if (!referenced_) {
+        comm_.sendResponseError(cmd.id, ErrorCode::NotReferenced);
+        return;
+    }
+
+    uint16_t doorMm = 0;
+    if (!sensors_.readDoorMm(doorMm) || doorMm <= Config::Sensor::DOOR_ENTRY_CLEARANCE_MM) {
+        comm_.sendResponseError(cmd.id, ErrorCode::DoorNotOpen);
+        return;
+    }
+
+    comm_.sendAck(cmd.id);
+
+    gripperSteps_       = (int32_t)(cmd.gripperDepthMm * Config::Gripper::STEPS_PER_MM);
+    liftOffsetMm_       = cmd.liftOffsetMm;
+    actionBaseZ_        = (int32_t)axisZ_.positionMm();
+    pendingActionCmdId_ = cmd.id;
+    actionStartMs_      = millis();
+    actionPhase_        = 0;
+
+    axisZ_.moveTo((float)(actionBaseZ_ + liftOffsetMm_));
+    setState(AppState::BusyDeposit);
+}
+
 // ─── Zustandsupdates ─────────────────────────────────────────────────────────
 
 void AppController::updateHoming() {
+    // X- und Z-Achse sequenziell (X zuerst, dann Z)
     if (!xHomed_) {
         axisX_.update();
     } else if (!homingZStarted_) {
@@ -289,17 +355,37 @@ void AppController::updateHoming() {
         axisZ_.update();
     }
 
+    // Greifer und Türarm parallel, Taster direkt am ESP auswerten
+    if (!gripperHomed_) {
+        gripper_.update();
+        if (sensors_.isGripperHome()) {
+            gripper_.stop();
+            gripper_.resetPosition();
+            gripperHomed_ = true;
+        }
+    }
+    if (!doorArmHomed_) {
+        doorArm_.update();
+        if (sensors_.isDoorArmHome()) {
+            doorArm_.stop();
+            doorArm_.resetPosition();
+            doorArmHomed_ = true;
+        }
+    }
+
     checkDriverAlarms();
     if (state_ != AppState::BusyHoming) return;
 
     if ((millis() - homingStartMs_) > Config::Timing::HOME_TIMEOUT_MS) {
         axisX_.stop();
         axisZ_.stop();
+        gripper_.stop();
+        doorArm_.stop();
         enterError(ErrorCode::HomingTimeout);
         return;
     }
 
-    if (xHomed_ && zHomed_) {
+    if (xHomed_ && zHomed_ && gripperHomed_ && doorArmHomed_) {
         axisZ_.stop();
         current_    = Position{};
         target_     = Position{};
@@ -409,6 +495,83 @@ void AppController::updateMoving() {
     }
 }
 
+void AppController::updatePickup() {
+    if ((millis() - actionStartMs_) > Config::Timing::MOVE_TIMEOUT_MS) {
+        gripper_.stop();
+        axisZ_.stop();
+        enterError(ErrorCode::MoveTimeout);
+        return;
+    }
+
+    switch (actionPhase_) {
+        case 0: // Greifer fährt aus – gripper_.update() läuft im Haupt-Loop
+            if (!gripper_.isMoving()) {
+                axisZ_.moveTo((float)(actionBaseZ_ + liftOffsetMm_));
+                actionPhase_ = 1;
+            }
+            break;
+        case 1: // Z hebt an
+            if (axisZ_.update()) {
+                if (!sensors_.isPlateDetected()) {
+                    gripper_.stop();
+                    enterError(ErrorCode::PlateNotDetected);
+                    return;
+                }
+                gripper_.move(-gripperSteps_);
+                actionPhase_ = 2;
+            }
+            break;
+        case 2: // Greifer fährt ein
+            if (!gripper_.isMoving()) {
+                current_.x_mm = (int32_t)axisX_.positionMm();
+                current_.z_mm = (int32_t)axisZ_.positionMm();
+                target_       = current_;
+                reporter_.sendOk(pendingActionCmdId_, "PICKUP_DONE", motionSnapshot());
+                setState(AppState::Ready);
+            }
+            break;
+    }
+}
+
+void AppController::updateDeposit() {
+    if ((millis() - actionStartMs_) > Config::Timing::MOVE_TIMEOUT_MS) {
+        gripper_.stop();
+        axisZ_.stop();
+        enterError(ErrorCode::MoveTimeout);
+        return;
+    }
+
+    switch (actionPhase_) {
+        case 0: // Z hebt an (gestartet in handleDeposit)
+            if (axisZ_.update()) {
+                gripper_.move(gripperSteps_);
+                actionPhase_ = 1;
+            }
+            break;
+        case 1: // Greifer fährt aus
+            if (!gripper_.isMoving()) {
+                axisZ_.moveTo((float)actionBaseZ_);
+                actionPhase_ = 2;
+            }
+            break;
+        case 2: // Z senkt ab
+            if (axisZ_.update()) {
+                gripper_.move(-gripperSteps_);
+                actionPhase_ = 3;
+            }
+            break;
+        case 3: // Greifer fährt ein
+            if (!gripper_.isMoving()) {
+                current_.x_mm = (int32_t)axisX_.positionMm();
+                current_.z_mm = (int32_t)axisZ_.positionMm();
+                target_       = current_;
+                reporter_.sendOk(pendingActionCmdId_, "DEPOSIT_DONE", motionSnapshot());
+                setState(AppState::Ready);
+            }
+            break;
+    }
+}
+
 void AppController::checkDriverAlarms() {
     if (axisX_.alarmActive() || axisZ_.alarmActive()) {
         axisX_.stop();
@@ -459,7 +622,8 @@ MotionSnapshot AppController::motionSnapshot() const {
     m.current.z_mm = (int32_t)axisZ_.positionMm();
     m.target       = target_;
     m.busy         = (state_ == AppState::BusyHoming   || state_ == AppState::BusyScanning ||
-                      state_ == AppState::BusyMoving   || state_ == AppState::BusyMoveHome);
+                      state_ == AppState::BusyMoving   || state_ == AppState::BusyMoveHome ||
+                      state_ == AppState::BusyPickup   || state_ == AppState::BusyDeposit);
     m.referenced   = referenced_;
     return m;
 }
@@ -472,6 +636,10 @@ SensorSnapshot AppController::readSensors() {
         s.doorDistanceMm = doorMm;
         s.doorOpen       = (doorMm < Config::Sensor::DOOR_OPEN_MM);
     }
+    s.gripperHome   = sensors_.isGripperHome();
+    s.doorArmHome   = sensors_.isDoorArmHome();
+    s.plateDetected = sensors_.isPlateDetected();
+
     cachedSensors_ = s;
     return s;
 }

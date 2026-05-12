@@ -31,4 +31,11 @@ constexpr uint8_t DOOR_STEP = 17;
 constexpr uint8_t DOOR_DIR  = 16;
 constexpr uint8_t DOOR_EN   = 15;
 
+// Endschalter Greifer und Türarm (active-low, Hardware-Pullup extern)
+constexpr uint8_t GRIPPER_HOME_SW  = 36;
+constexpr uint8_t DOOR_ARM_HOME_SW = 39;
+
+// Plattenerkennungs-Taster auf Schlitten (active-low, Hardware-Pullup extern)
+constexpr uint8_t PLATE_SENSOR = 34;
+
 }  // namespace Pins

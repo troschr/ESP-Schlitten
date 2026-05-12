@@ -17,6 +17,9 @@ public:
     // Bewegung starten. steps > 0 = vorwärts, steps < 0 = rückwärts.
     void move(int32_t steps);
 
+    // Homing starten: Motor läuft bis stop() aufgerufen wird.
+    void startHoming(bool forward);
+
     // Einen Schritt ausführen falls fällig. true = Bewegung abgeschlossen.
     bool update();
 
@@ -33,6 +36,7 @@ private:
     uint32_t _stepsLeft    = 0;
     bool     _forward      = true;
     bool     _moving       = false;
+    bool     _homingMode   = false;
     uint32_t _nextStepUs   = 0;
 };
 

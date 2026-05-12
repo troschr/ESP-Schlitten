@@ -1,10 +1,17 @@
 #include "sensors/SensorManager.h"
 #include "config/Config.h"
+#include "config/Pins.h"
 #include <Wire.h>
 
 namespace esp_schlitten {
 
 void SensorManager::begin() {
+    _pinGripperHome = Pins::GRIPPER_HOME_SW;
+    _pinDoorArmHome = Pins::DOOR_ARM_HOME_SW;
+    _pinPlateSensor = Pins::PLATE_SENSOR;
+    pinMode(_pinGripperHome, INPUT);
+    pinMode(_pinDoorArmHome, INPUT);
+    pinMode(_pinPlateSensor, INPUT);
     // VL53L0X init
     _vl53.setTimeout(500);
     if (_vl53.init()) {

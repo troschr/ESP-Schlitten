@@ -169,31 +169,6 @@ Command CommandInterface::parseLine(String line) const {
     return cmd;
   }
 
-  // --- SET_CLAMP;position=<OPEN|CLOSED|SERVICE> ---
-  if (verb == "SET_CLAMP") {
-    cmd.type = CommandType::SetClamp;
-    for (uint8_t i = 3; i < fieldCount; ++i) {
-      String key, value;
-      if (!parseKeyValue(fields[i], key, value)) {
-        cmd.parseError = ErrorCode::InvalidCommand;
-        return cmd;
-      }
-      key.toLowerCase();
-      value.toUpperCase();
-      if (key != "position") { cmd.parseError = ErrorCode::InvalidCommand; return cmd; }
-      if      (value == "OPEN")    cmd.clampPosition = ClampPosition::Open;
-      else if (value == "CLOSED")  cmd.clampPosition = ClampPosition::Closed;
-      else if (value == "SERVICE") cmd.clampPosition = ClampPosition::Service;
-      else { cmd.parseError = ErrorCode::InvalidCommand; return cmd; }
-    }
-    if (cmd.clampPosition == ClampPosition::Unknown) {
-      cmd.parseError = ErrorCode::InvalidCommand;
-      return cmd;
-    }
-    cmd.valid = true;
-    return cmd;
-  }
-
   // --- SET_DOOR_ARM;position=<OPEN|CLOSED> ---
   if (verb == "SET_DOOR_ARM") {
     cmd.type = CommandType::SetDoorArm;
@@ -211,6 +186,31 @@ Command CommandInterface::parseLine(String line) const {
       else { cmd.parseError = ErrorCode::InvalidCommand; return cmd; }
     }
     if (cmd.doorArmPosition == DoorArmPosition::Unknown) {
+      cmd.parseError = ErrorCode::InvalidCommand;
+      return cmd;
+    }
+    cmd.valid = true;
+    return cmd;
+  }
+
+  // --- PICKUP;gripper_depth=<mm>;lift_offset=<mm> ---
+  if (verb == "PICKUP" || verb == "DEPOSIT") {
+    cmd.type = (verb == "PICKUP") ? CommandType::Pickup : CommandType::Deposit;
+    bool hasDepth = false, hasOffset = false;
+
+    for (uint8_t i = 3; i < fieldCount; ++i) {
+      String key, value;
+      if (!parseKeyValue(fields[i], key, value)) {
+        cmd.parseError = ErrorCode::InvalidCommand;
+        return cmd;
+      }
+      key.toLowerCase();
+      if      (key == "gripper_depth") { cmd.gripperDepthMm = (int32_t)value.toInt(); hasDepth  = true; }
+      else if (key == "lift_offset")   { cmd.liftOffsetMm   = (int32_t)value.toInt(); hasOffset = true; }
+      else { cmd.parseError = ErrorCode::InvalidCommand; return cmd; }
+    }
+
+    if (!hasDepth || !hasOffset) {
       cmd.parseError = ErrorCode::InvalidCommand;
       return cmd;
     }

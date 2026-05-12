@@ -18,6 +18,20 @@ void DrvActuator::begin() {
     digitalWrite(_pinEn,   HIGH);  // deaktiviert
 }
 
+void DrvActuator::startHoming(bool forward) {
+    if (_moving) stop();
+
+    _forward     = forward;
+    _homingMode  = true;
+
+    digitalWrite(_pinEn,  LOW);
+    digitalWrite(_pinDir, _forward ? HIGH : LOW);
+    delayMicroseconds(_dirSetupUs);
+
+    _moving     = true;
+    _nextStepUs = micros();
+}
+
 void DrvActuator::move(int32_t steps) {
     if (steps == 0) return;
     if (_moving) stop();
@@ -46,8 +60,8 @@ bool DrvActuator::update() {
     _stepPosition += _forward ? 1 : -1;
     _nextStepUs   += _stepDelayUs;
 
-    if (--_stepsLeft == 0) {
-        digitalWrite(_pinEn, HIGH);  // nach Fahrt deaktivieren (spart Wärme)
+    if (!_homingMode && --_stepsLeft == 0) {
+        digitalWrite(_pinEn, HIGH);
         _moving = false;
         return true;
     }
@@ -55,8 +69,9 @@ bool DrvActuator::update() {
 }
 
 void DrvActuator::stop() {
-    _moving    = false;
-    _stepsLeft = 0;
+    _moving     = false;
+    _homingMode = false;
+    _stepsLeft  = 0;
     digitalWrite(_pinEn, HIGH);
 }
 

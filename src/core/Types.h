@@ -11,6 +11,8 @@ enum class AppState : uint8_t {
     BusyScanning,
     BusyMoving,
     BusyMoveHome,
+    BusyPickup,
+    BusyDeposit,
     Stopped,
     Error,
 };
@@ -28,6 +30,8 @@ enum class ErrorCode : uint8_t {
     SensorFaultObstacle,
     SensorFaultGripper,
     DriverFault,
+    PlateNotDetected,
+    DoorNotOpen,
 };
 
 enum class CommandType : uint8_t {
@@ -41,22 +45,16 @@ enum class CommandType : uint8_t {
     HomeSwitchHit,
     MoveTo,
     MoveHome,
-    SetClamp,
     SetDoorArm,
     ResetError,
+    Pickup,
+    Deposit,
 };
 
 enum class HomingAxis : uint8_t {
     None,
     X,
     Z,
-};
-
-enum class ClampPosition : uint8_t {
-    Unknown,
-    Open,
-    Closed,
-    Service,
 };
 
 enum class DoorArmPosition : uint8_t {
@@ -75,9 +73,10 @@ struct Command {
     ErrorCode      parseError      = ErrorCode::None;
     uint32_t       id              = 0;
     Position       target;
-    HomingAxis     axis            = HomingAxis::None;
-    ClampPosition  clampPosition   = ClampPosition::Unknown;
-    DoorArmPosition doorArmPosition = DoorArmPosition::Unknown;
+    HomingAxis      axis             = HomingAxis::None;
+    DoorArmPosition doorArmPosition  = DoorArmPosition::Unknown;
+    int32_t         gripperDepthMm   = 0;
+    int32_t         liftOffsetMm     = 0;
     bool           valid           = false;
 };
 
@@ -85,8 +84,9 @@ struct SensorSnapshot {
     bool     doorOpen      = false;   // VL53L0X-Auswertung: true = Tür offen
     uint16_t doorDistanceMm = 0;      // VL53L0X-Rohwert in mm
     bool     obstacleOk    = true;    // TF-Luna: true = Weg frei
-    bool     gripperHome   = false;   // Greifer-Endschalter (am ESP, noch nicht verdrahtet)
-    bool     doorArmHome   = false;   // Türarm-Endschalter (am ESP, noch nicht verdrahtet)
+    bool     gripperHome    = false;   // Greifer-Endschalter (am ESP)
+    bool     doorArmHome    = false;   // Türarm-Endschalter (am ESP)
+    bool     plateDetected  = false;   // Plattenerkennungs-Taster (am ESP)
 };
 
 struct MotionSnapshot {
@@ -113,6 +113,8 @@ inline const char *toString(AppState state) {
         case AppState::BusyScanning:  return "BUSY_SCANNING";
         case AppState::BusyMoving:    return "BUSY_MOVING";
         case AppState::BusyMoveHome:  return "BUSY_MOVE_HOME";
+        case AppState::BusyPickup:    return "BUSY_PICKUP";
+        case AppState::BusyDeposit:   return "BUSY_DEPOSIT";
         case AppState::Stopped:       return "STOPPED";
         case AppState::Error:         return "ERROR";
     }
@@ -133,16 +135,8 @@ inline const char *toString(ErrorCode error) {
         case ErrorCode::SensorFaultObstacle: return "SENSOR_FAULT_OBSTACLE";
         case ErrorCode::SensorFaultGripper:  return "SENSOR_FAULT_GRIPPER";
         case ErrorCode::DriverFault:         return "DRIVER_FAULT";
-    }
-    return "UNKNOWN";
-}
-
-inline const char *toString(ClampPosition pos) {
-    switch (pos) {
-        case ClampPosition::Unknown: return "UNKNOWN";
-        case ClampPosition::Open:    return "OPEN";
-        case ClampPosition::Closed:  return "CLOSED";
-        case ClampPosition::Service: return "SERVICE";
+        case ErrorCode::PlateNotDetected:    return "PLATE_NOT_DETECTED";
+        case ErrorCode::DoorNotOpen:         return "DOOR_NOT_OPEN";
     }
     return "UNKNOWN";
 }

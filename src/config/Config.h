@@ -41,6 +41,7 @@ namespace MotionZ {
 namespace Gripper {
     constexpr uint32_t STEPS_PER_REV = 200;       // Vollschritte/Umdrehung (DRV8825 ohne Mikroschritt)
     constexpr uint32_t TRAVEL_STEPS  = 800;        // Schritte für vollständige Ein-/Ausfahrt
+    constexpr float    STEPS_PER_MM  = 4.0f;       // TODO: nach Kalibrierung anpassen
     constexpr uint32_t STEP_DELAY_US = 2000;       // Zeit zwischen zwei Schritten µs
     constexpr uint32_t STEP_US       = 2;          // STEP-Pulsbreite µs
     constexpr uint32_t DIR_US        = 1;          // DIR-Setup µs
@@ -67,6 +68,7 @@ namespace Timing {
 // ─── Sensoren ─────────────────────────────────────────────────────────────────
 namespace Sensor {
     constexpr uint16_t DOOR_OPEN_MM          = 200;  // VL53L0X: unter diesem Wert = Tür offen
+    constexpr uint16_t DOOR_ENTRY_CLEARANCE_MM = 300; // Mindestwert für sicheres Einfahren des Greifers
     constexpr uint16_t OBSTACLE_STOP_MM      = 60;   // TF-Luna: Stopp-Abstand (Normalbetrieb)
     constexpr uint16_t OBSTACLE_WARN_MM      = 120;  // TF-Luna: Warnabstand
     constexpr uint16_t SCAN_OBSTACLE_STOP_MM = 1000; // TF-Luna: Stopp-Abstand während Scanfahrt

@@ -32,14 +32,17 @@ private:
     void handleMoveTo(const Command &cmd);
     void handleMoveHome(const Command &cmd);
     void handleResetError(const Command &cmd);
-    void handleSetClamp(const Command &cmd);
     void handleSetDoorArm(const Command &cmd);
+    void handlePickup(const Command &cmd);
+    void handleDeposit(const Command &cmd);
 
     // ── Zustandsupdates (während Bewegung) ───────────────────────────────────
     void updateHoming();
     void updateScanning();
     void updateMoving();
     void updateMoveHome();
+    void updatePickup();
+    void updateDeposit();
     void checkDriverAlarms();
 
     // ── Zustandsmaschine ─────────────────────────────────────────────────────
@@ -74,6 +77,8 @@ private:
     uint32_t pendingHomeCmdId_    = 0;
     bool     xHomed_              = false;
     bool     zHomed_              = false;
+    bool     gripperHomed_        = false;
+    bool     doorArmHomed_        = false;
     bool     homingZStarted_      = false;
 
     uint32_t moveHomeStartMs_     = 0;
@@ -86,6 +91,14 @@ private:
     // Moving
     uint32_t moveStartMs_         = 0;
     uint32_t pendingMoveCmdId_    = 0;
+
+    // Pickup / Deposit
+    uint8_t  actionPhase_         = 0;
+    int32_t  gripperSteps_        = 0;
+    int32_t  liftOffsetMm_        = 0;
+    int32_t  actionBaseZ_         = 0;
+    uint32_t pendingActionCmdId_  = 0;
+    uint32_t actionStartMs_       = 0;
 
     // Sensoren (gecacht)
     SensorSnapshot cachedSensors_;
