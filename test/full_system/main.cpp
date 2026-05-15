@@ -57,7 +57,7 @@ constexpr uint8_t Y_STEP = 32, Y_DIR = 33, Y_EN = 25, Y_ALM = 26;
 // DRV8825 – Konfiguration
 // ════════════════════════════════════════════════════════════════════
 
-constexpr uint16_t DRV_STEPS_PER_REV   = 200;
+constexpr uint16_t DRV_STEPS_PER_REV    = 200;
 constexpr uint32_t GREIFER_TRAVEL_STEPS = 800;
 constexpr uint32_t TUER_TRAVEL_STEPS    = 800;
 constexpr float    TUER_SCHLITTEN_MM    = 50.0f;

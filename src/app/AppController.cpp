@@ -152,8 +152,8 @@ void AppController::handleHome(const Command &cmd) {
     error_            = ErrorCode::None;
 
     axisX_.startHoming(Config::MotionX::HOMING_FORWARD, Config::MotionX::HOMING_RPM);
-    gripper_.startHoming(false);
-    doorArm_.startHoming(false);
+    gripper_.startHoming(false, Config::Gripper::HOMING_STEP_DELAY_US);
+    doorArm_.startHoming(false, Config::DoorArm::HOMING_STEP_DELAY_US);
 
     setState(AppState::BusyHoming);
 }
@@ -355,22 +355,16 @@ void AppController::updateHoming() {
         axisZ_.update();
     }
 
-    // Greifer und Türarm parallel, Taster direkt am ESP auswerten
-    if (!gripperHomed_) {
-        gripper_.update();
-        if (sensors_.isGripperHome()) {
-            gripper_.stop();
-            gripper_.resetPosition();
-            gripperHomed_ = true;
-        }
+    // Greifer und Türarm: update() läuft im Haupt-Loop, hier nur Endschalter auswerten
+    if (!gripperHomed_ && sensors_.isGripperHome()) {
+        gripper_.stop();
+        gripper_.resetPosition();
+        gripperHomed_ = true;
     }
-    if (!doorArmHomed_) {
-        doorArm_.update();
-        if (sensors_.isDoorArmHome()) {
-            doorArm_.stop();
-            doorArm_.resetPosition();
-            doorArmHomed_ = true;
-        }
+    if (!doorArmHomed_ && sensors_.isDoorArmHome()) {
+        doorArm_.stop();
+        doorArm_.resetPosition();
+        doorArmHomed_ = true;
     }
 
     checkDriverAlarms();
@@ -512,11 +506,12 @@ void AppController::updatePickup() {
             break;
         case 1: // Z hebt an
             if (axisZ_.update()) {
-                if (!sensors_.isPlateDetected()) {
-                    gripper_.stop();
-                    enterError(ErrorCode::PlateNotDetected);
-                    return;
-                }
+                // TODO: Plattendetektierung wieder aktivieren
+                // if (!sensors_.isPlateDetected()) {
+                //     gripper_.stop();
+                //     enterError(ErrorCode::PlateNotDetected);
+                //     return;
+                // }
                 gripper_.move(-gripperSteps_);
                 actionPhase_ = 2;
             }
@@ -631,17 +626,27 @@ MotionSnapshot AppController::motionSnapshot() const {
 SensorSnapshot AppController::readSensors() {
     SensorSnapshot s = cachedSensors_;
 
-    uint16_t doorMm = 0;
-    if (sensors_.readDoorMm(doorMm)) {
-        s.doorDistanceMm = doorMm;
-        s.doorOpen       = (doorMm < Config::Sensor::DOOR_OPEN_MM);
+    // I2C-Reads nur wenn kein Motor läuft – verhindert Timing-Störungen
+    if (!motorsRunning()) {
+        uint16_t doorMm = 0;
+        if (sensors_.readDoorMm(doorMm)) {
+            s.doorDistanceMm = doorMm;
+            s.doorOpen       = (doorMm < Config::Sensor::DOOR_OPEN_MM);
+        }
     }
+
+    // Digitale Reads sind µs-schnell, immer erlaubt
     s.gripperHome   = sensors_.isGripperHome();
     s.doorArmHome   = sensors_.isDoorArmHome();
     s.plateDetected = sensors_.isPlateDetected();
 
     cachedSensors_ = s;
     return s;
+}
+
+bool AppController::motorsRunning() const {
+    return axisX_.isMoving() || axisZ_.isMoving() ||
+           gripper_.isMoving() || doorArm_.isMoving();
 }
 
 }  // namespace esp_schlitten

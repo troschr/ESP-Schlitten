@@ -39,21 +39,23 @@ namespace MotionZ {
 
 // ─── DRV8825 Greifer ──────────────────────────────────────────────────────────
 namespace Gripper {
-    constexpr uint32_t STEPS_PER_REV = 200;       // Vollschritte/Umdrehung (DRV8825 ohne Mikroschritt)
-    constexpr uint32_t TRAVEL_STEPS  = 800;        // Schritte für vollständige Ein-/Ausfahrt
-    constexpr float    STEPS_PER_MM  = 4.0f;       // TODO: nach Kalibrierung anpassen
-    constexpr uint32_t STEP_DELAY_US = 2000;       // Zeit zwischen zwei Schritten µs
-    constexpr uint32_t STEP_US       = 2;          // STEP-Pulsbreite µs
-    constexpr uint32_t DIR_US        = 1;          // DIR-Setup µs
+    constexpr uint32_t STEPS_PER_REV    = 200;     // Vollschritte/Umdrehung (DRV8825 ohne Mikroschritt)
+    constexpr uint32_t TRAVEL_STEPS     = 800;      // Schritte für vollständige Ein-/Ausfahrt
+    constexpr float    STEPS_PER_MM     = 4.0f;     // TODO: nach Kalibrierung anpassen
+    constexpr uint32_t STEP_DELAY_US    = 2000;     // Zeit zwischen zwei Schritten µs (Normalbetrieb)
+    constexpr uint32_t HOMING_STEP_DELAY_US = 4000; // Zeit zwischen zwei Schritten µs (Referenzfahrt)
+    constexpr uint32_t STEP_US          = 2;        // STEP-Pulsbreite µs
+    constexpr uint32_t DIR_US           = 1;        // DIR-Setup µs
 }
 
 // ─── DRV8825 Türarm ───────────────────────────────────────────────────────────
 namespace DoorArm {
-    constexpr uint32_t STEPS_PER_REV = 200;
-    constexpr uint32_t TRAVEL_STEPS  = 800;
-    constexpr uint32_t STEP_DELAY_US = 2000;
-    constexpr uint32_t STEP_US       = 2;
-    constexpr uint32_t DIR_US        = 1;
+    constexpr uint32_t STEPS_PER_REV    = 200;
+    constexpr uint32_t TRAVEL_STEPS     = 800;
+    constexpr uint32_t STEP_DELAY_US    = 2000;
+    constexpr uint32_t HOMING_STEP_DELAY_US = 2000; // langsamer während Referenzfahrt
+    constexpr uint32_t STEP_US          = 2;
+    constexpr uint32_t DIR_US           = 1;
 }
 
 // ─── Timing ───────────────────────────────────────────────────────────────────

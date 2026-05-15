@@ -18,7 +18,8 @@ public:
     void move(int32_t steps);
 
     // Homing starten: Motor läuft bis stop() aufgerufen wird.
-    void startHoming(bool forward);
+    // stepDelayUs = 0 → verwendet den im Konstruktor konfigurierten Wert.
+    void startHoming(bool forward, uint32_t stepDelayUs = 0);
 
     // Einen Schritt ausführen falls fällig. true = Bewegung abgeschlossen.
     bool update();
@@ -30,7 +31,7 @@ public:
 
 private:
     uint8_t  _pinStep, _pinDir, _pinEn;
-    uint32_t _stepPulseUs, _dirSetupUs, _stepDelayUs;
+    uint32_t _stepPulseUs, _dirSetupUs, _stepDelayUs, _activeStepDelayUs;
 
     int32_t  _stepPosition = 0;
     uint32_t _stepsLeft    = 0;

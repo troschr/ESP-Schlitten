@@ -6,7 +6,8 @@ namespace esp_schlitten {
 DrvActuator::DrvActuator(uint8_t pinStep, uint8_t pinDir, uint8_t pinEn,
                           uint32_t stepPulseUs, uint32_t dirSetupUs, uint32_t stepDelayUs)
     : _pinStep(pinStep), _pinDir(pinDir), _pinEn(pinEn)
-    , _stepPulseUs(stepPulseUs), _dirSetupUs(dirSetupUs), _stepDelayUs(stepDelayUs)
+    , _stepPulseUs(stepPulseUs), _dirSetupUs(dirSetupUs)
+    , _stepDelayUs(stepDelayUs), _activeStepDelayUs(stepDelayUs)
 {}
 
 void DrvActuator::begin() {
@@ -18,11 +19,12 @@ void DrvActuator::begin() {
     digitalWrite(_pinEn,   HIGH);  // deaktiviert
 }
 
-void DrvActuator::startHoming(bool forward) {
+void DrvActuator::startHoming(bool forward, uint32_t stepDelayUs) {
     if (_moving) stop();
 
-    _forward     = forward;
-    _homingMode  = true;
+    _forward           = forward;
+    _homingMode        = true;
+    _activeStepDelayUs = (stepDelayUs > 0) ? stepDelayUs : _stepDelayUs;
 
     digitalWrite(_pinEn,  LOW);
     digitalWrite(_pinDir, _forward ? HIGH : LOW);
@@ -36,8 +38,9 @@ void DrvActuator::move(int32_t steps) {
     if (steps == 0) return;
     if (_moving) stop();
 
-    _forward   = steps > 0;
-    _stepsLeft = (uint32_t)abs(steps);
+    _forward           = steps > 0;
+    _stepsLeft         = (uint32_t)abs(steps);
+    _activeStepDelayUs = _stepDelayUs;
 
     digitalWrite(_pinEn,  LOW);
     digitalWrite(_pinDir, _forward ? HIGH : LOW);
@@ -58,7 +61,7 @@ bool DrvActuator::update() {
     digitalWrite(_pinStep, LOW);
 
     _stepPosition += _forward ? 1 : -1;
-    _nextStepUs   += _stepDelayUs;
+    _nextStepUs    = now + _activeStepDelayUs;
 
     if (!_homingMode && --_stepsLeft == 0) {
         digitalWrite(_pinEn, HIGH);

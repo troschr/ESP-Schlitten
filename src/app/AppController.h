@@ -54,6 +54,7 @@ private:
     void           publishStatus();
     MotionSnapshot motionSnapshot() const;
     SensorSnapshot readSensors();
+    bool           motorsRunning()  const;
 
     // ── Hardware ─────────────────────────────────────────────────────────────
     CommandInterface comm_;

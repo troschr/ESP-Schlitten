@@ -103,7 +103,7 @@ bool ClMotor::update() {
 
     _positionSteps += _forward ? 1 : -1;
     _stepsDone++;
-    _nextStepUs += 2 * d;
+    _nextStepUs = now + 2 * d;
 
     if (!_homingMode && _stepsDone >= _totalSteps) {
         _moving = false;
