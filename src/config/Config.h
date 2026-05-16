@@ -11,12 +11,12 @@ namespace Serial {
 
 // ─── CL42T X-Achse (Schlitten horizontal) ────────────────────────────────────
 namespace MotionX {
-    constexpr float    STEPS_PER_MM   = 160.0f;  // Schritte/mm (abhängig von Spindel + DIP-Schalter)
+    constexpr float    STEPS_PER_MM   = 50.0f;  // Schritte/mm (abhängig von Spindel + DIP-Schalter)
     constexpr uint32_t STEPS_PER_REV  = 800;      // Mikroschritte/Umdrehung (DIP am CL42T)
-    constexpr uint16_t MAX_RPM        = 300;       // Maximalgeschwindigkeit
-    constexpr uint16_t START_RPM      = 20;        // Startgeschwindigkeit (Fuß der Rampe)
-    constexpr uint16_t HOMING_RPM     = 30;        // Geschwindigkeit während Referenzfahrt
-    constexpr uint32_t ACCEL_STEPS    = 4000;      // Rampenlänge in Schritten
+    constexpr uint16_t MAX_RPM        = 20;       // Maximalgeschwindigkeit
+    constexpr uint16_t START_RPM      = 5;        // Startgeschwindigkeit (Fuß der Rampe)
+    constexpr uint16_t HOMING_RPM     = 15;        // Geschwindigkeit während Referenzfahrt
+    constexpr uint32_t ACCEL_STEPS    = 3000;      // Rampenlänge in Schritten
     constexpr uint32_t STEP_US        = 3;         // STEP-Pulsbreite µs (CL42T min. 2,5 µs)
     constexpr uint32_t DIR_US         = 5;         // DIR-Setup vor erstem STEP µs
     constexpr bool     HOMING_FORWARD = false;     // Richtung Referenzposition (false = rückwärts)
@@ -24,16 +24,16 @@ namespace MotionX {
 
 // ─── CL42T Z-Achse (Schlitten vertikal) ──────────────────────────────────────
 namespace MotionZ {
-    constexpr float    STEPS_PER_MM   = 160.0f;
+    constexpr float    STEPS_PER_MM   = 50.0f;
     constexpr uint32_t STEPS_PER_REV  = 800;
-    constexpr uint16_t MAX_RPM        = 300;
-    constexpr uint16_t START_RPM      = 20;
+    constexpr uint16_t MAX_RPM        = 100;
+    constexpr uint16_t START_RPM      = 5;
     constexpr uint16_t HOMING_RPM     = 30;
-    constexpr uint32_t ACCEL_STEPS    = 4000;
+    constexpr uint32_t ACCEL_STEPS    = 3000;
     constexpr uint32_t STEP_US        = 3;
     constexpr uint32_t DIR_US         = 5;
     constexpr bool     HOMING_FORWARD = false;
-    constexpr float    MAX_TRAVEL_MM   = 500.0f;   // maximale Z-Verfahrlänge
+    constexpr float    MAX_TRAVEL_MM   = 240.0f;   // maximale Z-Verfahrlänge
     constexpr float    SCAN_Z_PROBE_MM = 200.0f;   // Z-Position der zweiten TF-Luna-Messung beim Scan
 }
 
@@ -41,10 +41,10 @@ namespace MotionZ {
 namespace Gripper {
     constexpr uint32_t STEPS_PER_REV    = 200;     // Vollschritte/Umdrehung (DRV8825 ohne Mikroschritt)
     constexpr uint32_t TRAVEL_STEPS     = 800;      // Schritte für vollständige Ein-/Ausfahrt
-    constexpr float    STEPS_PER_MM     = 4.0f;     // TODO: nach Kalibrierung anpassen
-    constexpr uint32_t STEP_DELAY_US    = 2000;     // Zeit zwischen zwei Schritten µs (Normalbetrieb)
-    constexpr uint32_t HOMING_STEP_DELAY_US = 4000; // Zeit zwischen zwei Schritten µs (Referenzfahrt)
-    constexpr uint32_t STEP_US          = 2;        // STEP-Pulsbreite µs
+    constexpr float    STEPS_PER_MM     = 20.0f;     // TODO: nach Kalibrierung anpassen
+    constexpr uint32_t STEP_DELAY_US    = 1800;     // Zeit zwischen zwei Schritten µs (Normalbetrieb)
+    constexpr uint32_t HOMING_STEP_DELAY_US = 1500; // Zeit zwischen zwei Schritten µs (Referenzfahrt)
+    constexpr uint32_t STEP_US          = 4;        // STEP-Pulsbreite µs
     constexpr uint32_t DIR_US           = 1;        // DIR-Setup µs
 }
 
@@ -52,9 +52,9 @@ namespace Gripper {
 namespace DoorArm {
     constexpr uint32_t STEPS_PER_REV    = 200;
     constexpr uint32_t TRAVEL_STEPS     = 800;
-    constexpr uint32_t STEP_DELAY_US    = 2000;
-    constexpr uint32_t HOMING_STEP_DELAY_US = 2000; // langsamer während Referenzfahrt
-    constexpr uint32_t STEP_US          = 2;
+    constexpr uint32_t STEP_DELAY_US    = 1500;
+    constexpr uint32_t HOMING_STEP_DELAY_US = 1500; // langsamer während Referenzfahrt
+    constexpr uint32_t STEP_US          = 4;
     constexpr uint32_t DIR_US           = 1;
 }
 

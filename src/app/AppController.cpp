@@ -580,6 +580,12 @@ void AppController::checkDriverAlarms() {
 void AppController::setState(AppState next) {
     if (state_ == next) return;
     state_ = next;
+
+    if (next == AppState::Ready && current_.x_mm == 0 && current_.z_mm == 0) {
+        axisX_.enable(false);
+        axisZ_.enable(false);
+    }
+
     reporter_.sendState(state_, motionSnapshot());
 }
 
