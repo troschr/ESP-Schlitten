@@ -42,6 +42,10 @@ void ClMotor::enable(bool on) {
 }
 
 bool ClMotor::moveTo(float targetMm) {
+    return moveTo(targetMm, 0);
+}
+
+bool ClMotor::moveTo(float targetMm, uint16_t maxRpm) {
     if (_moving) return false;
 
     int32_t targetSteps = (int32_t)(targetMm * _stepsPerMm + (targetMm >= 0 ? 0.5f : -0.5f));
@@ -52,7 +56,7 @@ bool ClMotor::moveTo(float targetMm) {
     _forward       = delta > 0;
     _homingMode    = false;
     _stepsDone     = 0;
-    _halfUsCruise  = _dfltHalfUsCruise;
+    _halfUsCruise  = (maxRpm > 0) ? rpmToHalfUs(maxRpm) : _dfltHalfUsCruise;
     _halfUsStart   = _dfltHalfUsStart;
     _accelSteps    = _dfltAccelSteps;
 

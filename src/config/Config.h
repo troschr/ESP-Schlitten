@@ -11,15 +11,17 @@ namespace Serial {
 
 // ─── CL42T X-Achse (Schlitten horizontal) ────────────────────────────────────
 namespace MotionX {
-    constexpr float    STEPS_PER_MM   = 50.0f;  // Schritte/mm (abhängig von Spindel + DIP-Schalter)
-    constexpr uint32_t STEPS_PER_REV  = 800;      // Mikroschritte/Umdrehung (DIP am CL42T)
-    constexpr uint16_t MAX_RPM        = 20;       // Maximalgeschwindigkeit
-    constexpr uint16_t START_RPM      = 5;        // Startgeschwindigkeit (Fuß der Rampe)
-    constexpr uint16_t HOMING_RPM     = 15;        // Geschwindigkeit während Referenzfahrt
-    constexpr uint32_t ACCEL_STEPS    = 3000;      // Rampenlänge in Schritten
-    constexpr uint32_t STEP_US        = 3;         // STEP-Pulsbreite µs (CL42T min. 2,5 µs)
-    constexpr uint32_t DIR_US         = 5;         // DIR-Setup vor erstem STEP µs
-    constexpr bool     HOMING_FORWARD = false;     // Richtung Referenzposition (false = rückwärts)
+    constexpr float    STEPS_PER_MM      = 50.0f;  // Schritte/mm (abhängig von Spindel + DIP-Schalter)
+    constexpr uint32_t STEPS_PER_REV     = 800;      // Mikroschritte/Umdrehung (DIP am CL42T)
+    constexpr uint16_t MAX_RPM           = 20;       // Maximalgeschwindigkeit (Normalbetrieb)
+    constexpr uint16_t START_RPM         = 5;        // Startgeschwindigkeit (Fuß der Rampe)
+    constexpr uint16_t HOMING_RPM        = 15;       // Geschwindigkeit während Referenzfahrt
+    constexpr uint32_t ACCEL_STEPS       = 3000;     // Rampenlänge in Schritten
+    constexpr uint32_t STEP_US           = 3;        // STEP-Pulsbreite µs (CL42T min. 2,5 µs)
+    constexpr uint32_t DIR_US            = 5;        // DIR-Setup vor erstem STEP µs
+    constexpr bool     HOMING_FORWARD    = false;    // Richtung Referenzposition (false = rückwärts)
+    constexpr uint16_t DOOR_ARC_MAX_RPM  = 10;       // Maximalgeschwindigkeit X-Achse während Türöffnen
+    constexpr uint16_t DOOR_ARC_START_RPM = 3;       // Startgeschwindigkeit X-Achse während Türöffnen
 }
 
 // ─── CL42T Z-Achse (Schlitten vertikal) ──────────────────────────────────────
@@ -50,12 +52,15 @@ namespace Gripper {
 
 // ─── DRV8825 Türarm ───────────────────────────────────────────────────────────
 namespace DoorArm {
-    constexpr uint32_t STEPS_PER_REV    = 200;
-    constexpr uint32_t TRAVEL_STEPS     = 800;
-    constexpr uint32_t STEP_DELAY_US    = 1500;
-    constexpr uint32_t HOMING_STEP_DELAY_US = 1500; // langsamer während Referenzfahrt
-    constexpr uint32_t STEP_US          = 4;
-    constexpr uint32_t DIR_US           = 1;
+    constexpr uint32_t STEPS_PER_REV        = 200;
+    constexpr uint32_t TRAVEL_STEPS         = 800;
+    constexpr float    STEPS_PER_MM         = 20.0f;  // TODO: nach Kalibrierung anpassen
+    constexpr uint32_t STEP_US              = 4;
+    constexpr uint32_t DIR_US               = 1;
+    constexpr uint32_t STEP_DELAY_US        = 1500;
+    constexpr uint32_t HOMING_STEP_DELAY_US = 1500;
+    constexpr uint32_t ARC_STEPS_PER_DEG    = 1;      // Sub-Schritte pro Grad Öffnungswinkel
+    constexpr uint32_t ARC_STEP_DELAY_US    = 3000;   // Step-Delay Türarm während Kreisbogen (µs, höher = langsamer)
 }
 
 // ─── Timing ───────────────────────────────────────────────────────────────────

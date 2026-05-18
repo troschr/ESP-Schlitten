@@ -46,8 +46,10 @@ void AppController::update() {
         case AppState::BusyScanning: updateScanning(); break;
         case AppState::BusyMoving:   updateMoving();   break;
         case AppState::BusyMoveHome: updateMoveHome(); break;
-        case AppState::BusyPickup:   updatePickup();   break;
-        case AppState::BusyDeposit:  updateDeposit();  break;
+        case AppState::BusyPickup:    updatePickup();    break;
+        case AppState::BusyDeposit:   updateDeposit();   break;
+        case AppState::BusyOpenDoor:  updateOpenDoor();  break;
+        case AppState::BusyCloseDoor: updateCloseDoor(); break;
         default: break;
     }
 
@@ -99,7 +101,8 @@ void AppController::dispatchCommand(const Command &cmd) {
         case CommandType::MoveTo:        handleMoveTo(cmd);        return;
         case CommandType::MoveHome:      handleMoveHome(cmd);      return;
         case CommandType::ResetError:    handleResetError(cmd);    return;
-        case CommandType::SetDoorArm:    handleSetDoorArm(cmd);    return;
+        case CommandType::OpenDoor:      handleOpenDoor(cmd);      return;
+        case CommandType::CloseDoor:     handleCloseDoor(cmd);     return;
         case CommandType::Pickup:        handlePickup(cmd);        return;
         case CommandType::Deposit:       handleDeposit(cmd);       return;
         default:
@@ -132,9 +135,10 @@ void AppController::handleHome(const Command &cmd) {
         comm_.sendResponseError(cmd.id, ErrorCode::InvalidState);
         return;
     }
-    if (state_ == AppState::BusyHoming   || state_ == AppState::BusyMoving  ||
-        state_ == AppState::BusyScanning || state_ == AppState::BusyMoveHome ||
-        state_ == AppState::BusyPickup   || state_ == AppState::BusyDeposit) {
+    if (state_ == AppState::BusyHoming    || state_ == AppState::BusyMoving   ||
+        state_ == AppState::BusyScanning  || state_ == AppState::BusyMoveHome ||
+        state_ == AppState::BusyPickup    || state_ == AppState::BusyDeposit  ||
+        state_ == AppState::BusyOpenDoor  || state_ == AppState::BusyCloseDoor) {
         comm_.sendResponseError(cmd.id, ErrorCode::Busy);
         return;
     }
@@ -181,9 +185,10 @@ void AppController::handleMoveTo(const Command &cmd) {
         comm_.sendResponseError(cmd.id, ErrorCode::InvalidState);
         return;
     }
-    if (state_ == AppState::BusyHoming   || state_ == AppState::BusyMoving  ||
-        state_ == AppState::BusyScanning || state_ == AppState::BusyMoveHome ||
-        state_ == AppState::BusyPickup   || state_ == AppState::BusyDeposit) {
+    if (state_ == AppState::BusyHoming    || state_ == AppState::BusyMoving   ||
+        state_ == AppState::BusyScanning  || state_ == AppState::BusyMoveHome ||
+        state_ == AppState::BusyPickup    || state_ == AppState::BusyDeposit  ||
+        state_ == AppState::BusyOpenDoor  || state_ == AppState::BusyCloseDoor) {
         comm_.sendResponseError(cmd.id, ErrorCode::Busy);
         return;
     }
@@ -215,9 +220,10 @@ void AppController::handleMoveHome(const Command &cmd) {
         comm_.sendResponseError(cmd.id, ErrorCode::InvalidState);
         return;
     }
-    if (state_ == AppState::BusyHoming   || state_ == AppState::BusyMoving  ||
-        state_ == AppState::BusyScanning || state_ == AppState::BusyMoveHome ||
-        state_ == AppState::BusyPickup   || state_ == AppState::BusyDeposit) {
+    if (state_ == AppState::BusyHoming    || state_ == AppState::BusyMoving   ||
+        state_ == AppState::BusyScanning  || state_ == AppState::BusyMoveHome ||
+        state_ == AppState::BusyPickup    || state_ == AppState::BusyDeposit  ||
+        state_ == AppState::BusyOpenDoor  || state_ == AppState::BusyCloseDoor) {
         comm_.sendResponseError(cmd.id, ErrorCode::Busy);
         return;
     }
@@ -253,21 +259,78 @@ void AppController::handleResetError(const Command &cmd) {
     reporter_.sendOk(cmd.id, "ERROR_RESET", motionSnapshot());
 }
 
-void AppController::handleSetDoorArm(const Command &cmd) {
+void AppController::handleOpenDoor(const Command &cmd) {
     if (state_ == AppState::Error) {
         comm_.sendResponseError(cmd.id, ErrorCode::InvalidState);
         return;
     }
-    if (state_ == AppState::BusyHoming   || state_ == AppState::BusyMoving  ||
-        state_ == AppState::BusyScanning || state_ == AppState::BusyMoveHome ||
-        state_ == AppState::BusyPickup   || state_ == AppState::BusyDeposit) {
+    if (state_ == AppState::BusyHoming    || state_ == AppState::BusyMoving   ||
+        state_ == AppState::BusyScanning  || state_ == AppState::BusyMoveHome ||
+        state_ == AppState::BusyPickup    || state_ == AppState::BusyDeposit  ||
+        state_ == AppState::BusyOpenDoor  || state_ == AppState::BusyCloseDoor) {
         comm_.sendResponseError(cmd.id, ErrorCode::Busy);
         return;
     }
+    if (!referenced_) {
+        comm_.sendResponseError(cmd.id, ErrorCode::NotReferenced);
+        return;
+    }
+
     comm_.sendAck(cmd.id);
-    // TODO: Türarm-Aktor ansteuern wenn Mechanismus feststeht
-    String evtName = String("DOOR_ARM_") + toString(cmd.doorArmPosition);
-    reporter_.sendOk(cmd.id, evtName.c_str(), motionSnapshot());
+
+    doorOrigStartX_      = axisX_.positionMm();
+    doorOrigStartZ_      = axisZ_.positionMm();
+    doorHookDropMm_      = (float)cmd.hookDropMm;
+    doorXApproachMm_     = (float)cmd.xApproachMm;
+    doorArmExtendSteps_  = (int32_t)(cmd.armExtendMm * Config::DoorArm::STEPS_PER_MM);
+    doorRadiusMm_        = (float)cmd.radiusMm;
+    doorTargetAngleRad_  = (float)cmd.openAngleDeg * (float)M_PI / 180.0f;
+    doorArcTotalSteps_   = max(cmd.openAngleDeg * (int32_t)Config::DoorArm::ARC_STEPS_PER_DEG, 4);
+    doorArcStep_         = 0;
+    doorPhase_           = 0;
+    pendingDoorCmdId_    = cmd.id;
+    doorStartMs_         = millis();
+
+    // Phase 0: Z absenken zum Einhaken
+    axisZ_.moveTo(doorOrigStartZ_ - doorHookDropMm_);
+    setState(AppState::BusyOpenDoor);
+}
+
+void AppController::handleCloseDoor(const Command &cmd) {
+    if (state_ == AppState::Error) {
+        comm_.sendResponseError(cmd.id, ErrorCode::InvalidState);
+        return;
+    }
+    if (state_ == AppState::BusyHoming    || state_ == AppState::BusyMoving   ||
+        state_ == AppState::BusyScanning  || state_ == AppState::BusyMoveHome ||
+        state_ == AppState::BusyPickup    || state_ == AppState::BusyDeposit  ||
+        state_ == AppState::BusyOpenDoor  || state_ == AppState::BusyCloseDoor) {
+        comm_.sendResponseError(cmd.id, ErrorCode::Busy);
+        return;
+    }
+    if (!referenced_) {
+        comm_.sendResponseError(cmd.id, ErrorCode::NotReferenced);
+        return;
+    }
+
+    comm_.sendAck(cmd.id);
+
+    doorOrigStartX_      = axisX_.positionMm();
+    doorOrigStartZ_      = axisZ_.positionMm();
+    doorHookDropMm_      = (float)cmd.hookDropMm;
+    doorXApproachMm_     = (float)cmd.xApproachMm;
+    doorArmExtendSteps_  = (int32_t)(cmd.armExtendMm * Config::DoorArm::STEPS_PER_MM);
+    doorRadiusMm_        = (float)cmd.radiusMm;
+    doorTargetAngleRad_  = (float)cmd.openAngleDeg * (float)M_PI / 180.0f;
+    doorArcTotalSteps_   = max(cmd.openAngleDeg * (int32_t)Config::DoorArm::ARC_STEPS_PER_DEG, 4);
+    doorArcStep_         = doorArcTotalSteps_;
+    doorPhase_           = 0;
+    pendingDoorCmdId_    = cmd.id;
+    doorStartMs_         = millis();
+
+    // Phase 0: Z absenken zum Einhaken
+    axisZ_.moveTo(doorOrigStartZ_ - doorHookDropMm_);
+    setState(AppState::BusyCloseDoor);
 }
 
 void AppController::handlePickup(const Command &cmd) {
@@ -275,9 +338,10 @@ void AppController::handlePickup(const Command &cmd) {
         comm_.sendResponseError(cmd.id, ErrorCode::InvalidState);
         return;
     }
-    if (state_ == AppState::BusyHoming   || state_ == AppState::BusyMoving  ||
-        state_ == AppState::BusyScanning || state_ == AppState::BusyMoveHome ||
-        state_ == AppState::BusyPickup   || state_ == AppState::BusyDeposit) {
+    if (state_ == AppState::BusyHoming    || state_ == AppState::BusyMoving   ||
+        state_ == AppState::BusyScanning  || state_ == AppState::BusyMoveHome ||
+        state_ == AppState::BusyPickup    || state_ == AppState::BusyDeposit  ||
+        state_ == AppState::BusyOpenDoor  || state_ == AppState::BusyCloseDoor) {
         comm_.sendResponseError(cmd.id, ErrorCode::Busy);
         return;
     }
@@ -310,9 +374,10 @@ void AppController::handleDeposit(const Command &cmd) {
         comm_.sendResponseError(cmd.id, ErrorCode::InvalidState);
         return;
     }
-    if (state_ == AppState::BusyHoming   || state_ == AppState::BusyMoving  ||
-        state_ == AppState::BusyScanning || state_ == AppState::BusyMoveHome ||
-        state_ == AppState::BusyPickup   || state_ == AppState::BusyDeposit) {
+    if (state_ == AppState::BusyHoming    || state_ == AppState::BusyMoving   ||
+        state_ == AppState::BusyScanning  || state_ == AppState::BusyMoveHome ||
+        state_ == AppState::BusyPickup    || state_ == AppState::BusyDeposit  ||
+        state_ == AppState::BusyOpenDoor  || state_ == AppState::BusyCloseDoor) {
         comm_.sendResponseError(cmd.id, ErrorCode::Busy);
         return;
     }
@@ -567,6 +632,184 @@ void AppController::updateDeposit() {
     }
 }
 
+void AppController::updateOpenDoor() {
+    if ((millis() - doorStartMs_) > Config::Timing::MOVE_TIMEOUT_MS) {
+        doorArm_.stop();
+        axisX_.stop();
+        axisZ_.stop();
+        enterError(ErrorCode::MoveTimeout);
+        return;
+    }
+
+    checkDriverAlarms();
+    if (state_ != AppState::BusyOpenDoor) return;
+
+    switch (doorPhase_) {
+        case 0: // Z absenken (gestartet in handleOpenDoor)
+            if (axisZ_.update()) {
+                axisX_.moveTo(doorOrigStartX_ + doorXApproachMm_);
+                doorPhase_ = 1;
+            }
+            break;
+        case 1: // X zum Drucker vorfahren
+            if (axisX_.update()) {
+                doorArcStartX_ = axisX_.positionMm();
+                doorArm_.move(doorArmExtendSteps_);
+                doorPhase_ = 2;
+            }
+            break;
+        case 2: // Arm ausfahren → Tür greifen
+            if (!doorArm_.isMoving()) {
+                axisZ_.moveTo(doorOrigStartZ_);
+                doorPhase_ = 3;
+            }
+            break;
+        case 3: // Z anheben → eingehakt
+            if (axisZ_.update()) {
+                doorArcStep_ = 0;
+                doorPhase_   = 4;
+            }
+            break;
+        case 4: { // Kreisbogen öffnen: Sub-Schritte 0 → doorArcTotalSteps_
+            if (doorArm_.isMoving() || axisX_.isMoving()) {
+                axisX_.update();
+                break;
+            }
+            if (doorArcStep_ > doorArcTotalSteps_) {
+                axisZ_.moveTo(doorOrigStartZ_ - doorHookDropMm_);
+                doorPhase_ = 5;
+                break;
+            }
+            const float   theta     = (float)doorArcStep_ / (float)doorArcTotalSteps_ * doorTargetAngleRad_;
+            const int32_t armTarget = doorArmExtendSteps_ +
+                (int32_t)(doorRadiusMm_ * sinf(theta) * Config::DoorArm::STEPS_PER_MM);
+            const float   xTarget   = doorArcStartX_ + doorRadiusMm_ * (cosf(theta) - 1.0f);
+            const int32_t armDelta  = armTarget - doorArm_.stepPosition();
+            if (armDelta != 0) doorArm_.move(armDelta, Config::DoorArm::ARC_STEP_DELAY_US);
+            axisX_.moveTo(xTarget, Config::MotionX::DOOR_ARC_MAX_RPM);
+            axisX_.update();
+            doorArcStep_++;
+            break;
+        }
+        case 5: // Z absenken → ausgehakt
+            if (axisZ_.update()) {
+                doorArm_.move(-doorArm_.stepPosition());
+                doorPhase_ = 6;
+            }
+            break;
+        case 6: // Arm einfahren
+            if (!doorArm_.isMoving()) {
+                axisX_.moveTo(doorOrigStartX_);
+                axisZ_.moveTo(doorOrigStartZ_);
+                doorPhase_ = 7;
+            }
+            break;
+        case 7: { // Schlitten zurück zur Ausgangsposition (X und Z gleichzeitig)
+            const bool xDone = axisX_.update();
+            const bool zDone = axisZ_.update();
+            if (xDone && zDone) {
+                current_.x_mm = (int32_t)axisX_.positionMm();
+                current_.z_mm = (int32_t)axisZ_.positionMm();
+                target_       = current_;
+                reporter_.sendOk(pendingDoorCmdId_, "DOOR_OPEN_DONE", motionSnapshot());
+                setState(AppState::Ready);
+            }
+            break;
+        }
+    }
+}
+
+void AppController::updateCloseDoor() {
+    if ((millis() - doorStartMs_) > Config::Timing::MOVE_TIMEOUT_MS) {
+        doorArm_.stop();
+        axisX_.stop();
+        axisZ_.stop();
+        enterError(ErrorCode::MoveTimeout);
+        return;
+    }
+
+    checkDriverAlarms();
+    if (state_ != AppState::BusyCloseDoor) return;
+
+    switch (doorPhase_) {
+        case 0: // Z absenken (gestartet in handleCloseDoor)
+            if (axisZ_.update()) {
+                axisX_.moveTo(doorOrigStartX_ + doorXApproachMm_);
+                doorPhase_ = 1;
+            }
+            break;
+        case 1: // X zum Drucker vorfahren
+            if (axisX_.update()) {
+                doorArcStartX_ = axisX_.positionMm();
+                // Grifftiefe bei geöffneter Tür: arm_extend + R * sin(angle)
+                const int32_t fullGripSteps = doorArmExtendSteps_ +
+                    (int32_t)(doorRadiusMm_ * sinf(doorTargetAngleRad_) * Config::DoorArm::STEPS_PER_MM);
+                doorArm_.move(fullGripSteps);
+                doorPhase_ = 2;
+            }
+            break;
+        case 2: // Arm ausfahren → Tür greifen
+            if (!doorArm_.isMoving()) {
+                axisZ_.moveTo(doorOrigStartZ_);
+                doorPhase_ = 3;
+            }
+            break;
+        case 3: // Z anheben → eingehakt
+            if (axisZ_.update()) {
+                doorArcStep_ = doorArcTotalSteps_;
+                doorPhase_   = 4;
+            }
+            break;
+        case 4: { // Kreisbogen schließen: Sub-Schritte doorArcTotalSteps_ → 0
+            if (doorArm_.isMoving() || axisX_.isMoving()) {
+                axisX_.update();
+                break;
+            }
+            if (doorArcStep_ < 0) {
+                axisZ_.moveTo(doorOrigStartZ_ - doorHookDropMm_);
+                doorPhase_ = 5;
+                break;
+            }
+            const float   theta     = (float)doorArcStep_ / (float)doorArcTotalSteps_ * doorTargetAngleRad_;
+            const int32_t armTarget = doorArmExtendSteps_ +
+                (int32_t)(doorRadiusMm_ * sinf(theta) * Config::DoorArm::STEPS_PER_MM);
+            const float   xTarget   = doorArcStartX_ +
+                doorRadiusMm_ * (cosf(theta) - cosf(doorTargetAngleRad_));
+            const int32_t armDelta  = armTarget - doorArm_.stepPosition();
+            if (armDelta != 0) doorArm_.move(armDelta, Config::DoorArm::ARC_STEP_DELAY_US);
+            axisX_.moveTo(xTarget, Config::MotionX::DOOR_ARC_MAX_RPM);
+            axisX_.update();
+            doorArcStep_--;
+            break;
+        }
+        case 5: // Z absenken → ausgehakt
+            if (axisZ_.update()) {
+                doorArm_.move(-doorArm_.stepPosition());
+                doorPhase_ = 6;
+            }
+            break;
+        case 6: // Arm einfahren
+            if (!doorArm_.isMoving()) {
+                axisX_.moveTo(doorOrigStartX_);
+                axisZ_.moveTo(doorOrigStartZ_);
+                doorPhase_ = 7;
+            }
+            break;
+        case 7: { // Schlitten zurück zur Ausgangsposition (X und Z gleichzeitig)
+            const bool xDone = axisX_.update();
+            const bool zDone = axisZ_.update();
+            if (xDone && zDone) {
+                current_.x_mm = (int32_t)axisX_.positionMm();
+                current_.z_mm = (int32_t)axisZ_.positionMm();
+                target_       = current_;
+                reporter_.sendOk(pendingDoorCmdId_, "DOOR_CLOSE_DONE", motionSnapshot());
+                setState(AppState::Ready);
+            }
+            break;
+        }
+    }
+}
+
 void AppController::checkDriverAlarms() {
     if (axisX_.alarmActive() || axisZ_.alarmActive()) {
         axisX_.stop();
@@ -622,9 +865,10 @@ MotionSnapshot AppController::motionSnapshot() const {
     m.current.x_mm = (int32_t)axisX_.positionMm();
     m.current.z_mm = (int32_t)axisZ_.positionMm();
     m.target       = target_;
-    m.busy         = (state_ == AppState::BusyHoming   || state_ == AppState::BusyScanning ||
-                      state_ == AppState::BusyMoving   || state_ == AppState::BusyMoveHome ||
-                      state_ == AppState::BusyPickup   || state_ == AppState::BusyDeposit);
+    m.busy         = (state_ == AppState::BusyHoming    || state_ == AppState::BusyScanning  ||
+                      state_ == AppState::BusyMoving    || state_ == AppState::BusyMoveHome  ||
+                      state_ == AppState::BusyPickup    || state_ == AppState::BusyDeposit   ||
+                      state_ == AppState::BusyOpenDoor  || state_ == AppState::BusyCloseDoor);
     m.referenced   = referenced_;
     return m;
 }

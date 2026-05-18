@@ -19,6 +19,8 @@ public:
 
     // Absolute Zielposition in mm anfahren. false = Motor bereits in Bewegung.
     bool moveTo(float targetMm);
+    // Wie moveTo(), aber mit explizitem maxRpm (überschreibt Konstruktorwert für diese Bewegung).
+    bool moveTo(float targetMm, uint16_t maxRpm);
 
     // Homing starten: Motor fährt mit homingRpm in 'forward'-Richtung bis stop().
     void startHoming(bool forward, uint16_t homingRpm);

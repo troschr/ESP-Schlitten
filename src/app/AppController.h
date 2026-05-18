@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include <Wire.h>
+#include <math.h>
 
 #include "comm/CommandInterface.h"
 #include "config/Config.h"
@@ -32,7 +33,8 @@ private:
     void handleMoveTo(const Command &cmd);
     void handleMoveHome(const Command &cmd);
     void handleResetError(const Command &cmd);
-    void handleSetDoorArm(const Command &cmd);
+    void handleOpenDoor(const Command &cmd);
+    void handleCloseDoor(const Command &cmd);
     void handlePickup(const Command &cmd);
     void handleDeposit(const Command &cmd);
 
@@ -43,6 +45,8 @@ private:
     void updateMoveHome();
     void updatePickup();
     void updateDeposit();
+    void updateOpenDoor();
+    void updateCloseDoor();
     void checkDriverAlarms();
 
     // ── Zustandsmaschine ─────────────────────────────────────────────────────
@@ -100,6 +104,21 @@ private:
     int32_t  actionBaseZ_         = 0;
     uint32_t pendingActionCmdId_  = 0;
     uint32_t actionStartMs_       = 0;
+
+    // Open / Close Door (Kreisbogen)
+    uint8_t  doorPhase_           = 0;
+    int      doorArcStep_         = 0;   // aktueller Sub-Schritt
+    int      doorArcTotalSteps_   = 0;   // Gesamtzahl Sub-Schritte
+    float    doorRadiusMm_        = 0.0f;
+    float    doorTargetAngleRad_  = 0.0f;
+    int32_t  doorArmExtendSteps_  = 0;   // Grifftiefe in Schritten
+    float    doorOrigStartX_      = 0.0f; // X bei Befehlsempfang → Rückfahrtziel
+    float    doorOrigStartZ_      = 0.0f; // Z bei Befehlsempfang → Rückfahrtziel
+    float    doorArcStartX_       = 0.0f; // X nach x_approach → Bogenmittelpunkt-Referenz
+    float    doorHookDropMm_      = 0.0f; // Z-Absenkweg zum Einhaken
+    float    doorXApproachMm_     = 0.0f; // X-Versatz nach hook_drop (Richtung Drucker)
+    uint32_t pendingDoorCmdId_    = 0;
+    uint32_t doorStartMs_         = 0;
 
     // Sensoren (gecacht)
     SensorSnapshot cachedSensors_;

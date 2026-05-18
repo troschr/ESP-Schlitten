@@ -35,12 +35,16 @@ void DrvActuator::startHoming(bool forward, uint32_t stepDelayUs) {
 }
 
 void DrvActuator::move(int32_t steps) {
+    move(steps, _stepDelayUs);
+}
+
+void DrvActuator::move(int32_t steps, uint32_t stepDelayUs) {
     if (steps == 0) return;
     if (_moving) stop();
 
     _forward           = steps > 0;
     _stepsLeft         = (uint32_t)abs(steps);
-    _activeStepDelayUs = _stepDelayUs;
+    _activeStepDelayUs = stepDelayUs;
 
     digitalWrite(_pinEn,  LOW);
     digitalWrite(_pinDir, _forward ? HIGH : LOW);

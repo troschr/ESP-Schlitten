@@ -13,6 +13,8 @@ enum class AppState : uint8_t {
     BusyMoveHome,
     BusyPickup,
     BusyDeposit,
+    BusyOpenDoor,
+    BusyCloseDoor,
     Stopped,
     Error,
 };
@@ -45,7 +47,8 @@ enum class CommandType : uint8_t {
     HomeSwitchHit,
     MoveTo,
     MoveHome,
-    SetDoorArm,
+    OpenDoor,
+    CloseDoor,
     ResetError,
     Pickup,
     Deposit,
@@ -57,27 +60,25 @@ enum class HomingAxis : uint8_t {
     Z,
 };
 
-enum class DoorArmPosition : uint8_t {
-    Unknown,
-    Open,
-    Closed,
-};
-
 struct Position {
     int32_t x_mm = 0;
     int32_t z_mm = 0;
 };
 
 struct Command {
-    CommandType    type            = CommandType::None;
-    ErrorCode      parseError      = ErrorCode::None;
-    uint32_t       id              = 0;
-    Position       target;
-    HomingAxis      axis             = HomingAxis::None;
-    DoorArmPosition doorArmPosition  = DoorArmPosition::Unknown;
-    int32_t         gripperDepthMm   = 0;
-    int32_t         liftOffsetMm     = 0;
-    bool           valid           = false;
+    CommandType type           = CommandType::None;
+    ErrorCode   parseError     = ErrorCode::None;
+    uint32_t    id             = 0;
+    Position    target;
+    HomingAxis  axis           = HomingAxis::None;
+    int32_t     gripperDepthMm = 0;
+    int32_t     liftOffsetMm   = 0;
+    int32_t     armExtendMm    = 0;
+    int32_t     radiusMm       = 0;
+    int32_t     openAngleDeg   = 0;
+    int32_t     hookDropMm     = 0;
+    int32_t     xApproachMm    = 0;
+    bool        valid          = false;
 };
 
 struct SensorSnapshot {
@@ -115,6 +116,8 @@ inline const char *toString(AppState state) {
         case AppState::BusyMoveHome:  return "BUSY_MOVE_HOME";
         case AppState::BusyPickup:    return "BUSY_PICKUP";
         case AppState::BusyDeposit:   return "BUSY_DEPOSIT";
+        case AppState::BusyOpenDoor:  return "BUSY_OPEN_DOOR";
+        case AppState::BusyCloseDoor: return "BUSY_CLOSE_DOOR";
         case AppState::Stopped:       return "STOPPED";
         case AppState::Error:         return "ERROR";
     }
@@ -141,13 +144,5 @@ inline const char *toString(ErrorCode error) {
     return "UNKNOWN";
 }
 
-inline const char *toString(DoorArmPosition pos) {
-    switch (pos) {
-        case DoorArmPosition::Unknown: return "UNKNOWN";
-        case DoorArmPosition::Open:    return "OPEN";
-        case DoorArmPosition::Closed:  return "CLOSED";
-    }
-    return "UNKNOWN";
-}
 
 }  // namespace esp_schlitten

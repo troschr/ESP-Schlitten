@@ -169,9 +169,10 @@ Command CommandInterface::parseLine(String line) const {
     return cmd;
   }
 
-  // --- SET_DOOR_ARM;position=<OPEN|CLOSED> ---
-  if (verb == "SET_DOOR_ARM") {
-    cmd.type = CommandType::SetDoorArm;
+  // --- OPEN_DOOR;arm_extend=<mm>;radius=<mm>;angle=<deg> ---
+  if (verb == "OPEN_DOOR") {
+    cmd.type = CommandType::OpenDoor;
+    bool hasExtend = false, hasRadius = false, hasAngle = false;
     for (uint8_t i = 3; i < fieldCount; ++i) {
       String key, value;
       if (!parseKeyValue(fields[i], key, value)) {
@@ -179,13 +180,40 @@ Command CommandInterface::parseLine(String line) const {
         return cmd;
       }
       key.toLowerCase();
-      value.toUpperCase();
-      if (key != "position") { cmd.parseError = ErrorCode::InvalidCommand; return cmd; }
-      if      (value == "OPEN")   cmd.doorArmPosition = DoorArmPosition::Open;
-      else if (value == "CLOSED") cmd.doorArmPosition = DoorArmPosition::Closed;
+      if      (key == "arm_extend") { cmd.armExtendMm  = (int32_t)value.toInt(); hasExtend = true; }
+      else if (key == "radius")     { cmd.radiusMm      = (int32_t)value.toInt(); hasRadius = true; }
+      else if (key == "angle")      { cmd.openAngleDeg  = (int32_t)value.toInt(); hasAngle  = true; }
+      else if (key == "hook_drop")  { cmd.hookDropMm    = (int32_t)value.toInt(); }
+      else if (key == "x_approach") { cmd.xApproachMm   = (int32_t)value.toInt(); }
       else { cmd.parseError = ErrorCode::InvalidCommand; return cmd; }
     }
-    if (cmd.doorArmPosition == DoorArmPosition::Unknown) {
+    if (!hasExtend || !hasRadius || !hasAngle) {
+      cmd.parseError = ErrorCode::InvalidCommand;
+      return cmd;
+    }
+    cmd.valid = true;
+    return cmd;
+  }
+
+  // --- CLOSE_DOOR;arm_extend=<mm>;radius=<mm>;angle=<deg> ---
+  if (verb == "CLOSE_DOOR") {
+    cmd.type = CommandType::CloseDoor;
+    bool hasExtend = false, hasRadius = false, hasAngle = false;
+    for (uint8_t i = 3; i < fieldCount; ++i) {
+      String key, value;
+      if (!parseKeyValue(fields[i], key, value)) {
+        cmd.parseError = ErrorCode::InvalidCommand;
+        return cmd;
+      }
+      key.toLowerCase();
+      if      (key == "arm_extend") { cmd.armExtendMm  = (int32_t)value.toInt(); hasExtend = true; }
+      else if (key == "radius")     { cmd.radiusMm      = (int32_t)value.toInt(); hasRadius = true; }
+      else if (key == "angle")      { cmd.openAngleDeg  = (int32_t)value.toInt(); hasAngle  = true; }
+      else if (key == "hook_drop")  { cmd.hookDropMm    = (int32_t)value.toInt(); }
+      else if (key == "x_approach") { cmd.xApproachMm   = (int32_t)value.toInt(); }
+      else { cmd.parseError = ErrorCode::InvalidCommand; return cmd; }
+    }
+    if (!hasExtend || !hasRadius || !hasAngle) {
       cmd.parseError = ErrorCode::InvalidCommand;
       return cmd;
     }

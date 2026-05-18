@@ -16,6 +16,8 @@ public:
 
     // Bewegung starten. steps > 0 = vorwärts, steps < 0 = rückwärts.
     void move(int32_t steps);
+    // Wie move(), aber mit explizitem Step-Delay (überschreibt Konstruktorwert für diese Bewegung).
+    void move(int32_t steps, uint32_t stepDelayUs);
 
     // Homing starten: Motor läuft bis stop() aufgerufen wird.
     // stepDelayUs = 0 → verwendet den im Konstruktor konfigurierten Wert.
