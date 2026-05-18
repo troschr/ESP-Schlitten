@@ -78,6 +78,7 @@ struct Command {
     int32_t     openAngleDeg   = 0;
     int32_t     hookDropMm     = 0;
     int32_t     xApproachMm    = 0;
+    int32_t     zApproachMm    = 0;
     bool        valid          = false;
 };
 

@@ -282,17 +282,18 @@ void AppController::handleOpenDoor(const Command &cmd) {
     doorOrigStartZ_      = axisZ_.positionMm();
     doorHookDropMm_      = (float)cmd.hookDropMm;
     doorXApproachMm_     = (float)cmd.xApproachMm;
+    doorZApproachMm_     = (float)cmd.zApproachMm;
     doorArmExtendSteps_  = (int32_t)(cmd.armExtendMm * Config::DoorArm::STEPS_PER_MM);
     doorRadiusMm_        = (float)cmd.radiusMm;
     doorTargetAngleRad_  = (float)cmd.openAngleDeg * (float)M_PI / 180.0f;
     doorArcTotalSteps_   = max(cmd.openAngleDeg * (int32_t)Config::DoorArm::ARC_STEPS_PER_DEG, 4);
-    doorArcStep_         = 0;
     doorPhase_           = 0;
     pendingDoorCmdId_    = cmd.id;
     doorStartMs_         = millis();
 
-    // Phase 0: Z absenken zum Einhaken
-    axisZ_.moveTo(doorOrigStartZ_ - doorHookDropMm_);
+    // Phase 0: XZ-Anfahrposition ansteuern
+    axisX_.moveTo(doorXApproachMm_);
+    axisZ_.moveTo(doorZApproachMm_);
     setState(AppState::BusyOpenDoor);
 }
 
@@ -319,17 +320,18 @@ void AppController::handleCloseDoor(const Command &cmd) {
     doorOrigStartZ_      = axisZ_.positionMm();
     doorHookDropMm_      = (float)cmd.hookDropMm;
     doorXApproachMm_     = (float)cmd.xApproachMm;
+    doorZApproachMm_     = (float)cmd.zApproachMm;
     doorArmExtendSteps_  = (int32_t)(cmd.armExtendMm * Config::DoorArm::STEPS_PER_MM);
     doorRadiusMm_        = (float)cmd.radiusMm;
     doorTargetAngleRad_  = (float)cmd.openAngleDeg * (float)M_PI / 180.0f;
     doorArcTotalSteps_   = max(cmd.openAngleDeg * (int32_t)Config::DoorArm::ARC_STEPS_PER_DEG, 4);
-    doorArcStep_         = doorArcTotalSteps_;
     doorPhase_           = 0;
     pendingDoorCmdId_    = cmd.id;
     doorStartMs_         = millis();
 
-    // Phase 0: Z absenken zum Einhaken
-    axisZ_.moveTo(doorOrigStartZ_ - doorHookDropMm_);
+    // Phase 0: XZ-Anfahrposition ansteuern
+    axisX_.moveTo(doorXApproachMm_);
+    axisZ_.moveTo(doorZApproachMm_);
     setState(AppState::BusyCloseDoor);
 }
 
@@ -645,39 +647,36 @@ void AppController::updateOpenDoor() {
     if (state_ != AppState::BusyOpenDoor) return;
 
     switch (doorPhase_) {
-        case 0: // Z absenken (gestartet in handleOpenDoor)
-            if (axisZ_.update()) {
-                axisX_.moveTo(doorOrigStartX_ + doorXApproachMm_);
+        case 0: { // XZ-Anfahrposition (gestartet in handleOpenDoor)
+            const bool xDone = axisX_.update();
+            const bool zDone = axisZ_.update();
+            if (xDone && zDone) {
+                doorArcStartX_ = axisX_.positionMm();
+                doorArm_.move(doorArmExtendSteps_);
                 doorPhase_ = 1;
             }
             break;
-        case 1: // X zum Drucker vorfahren
-            if (axisX_.update()) {
-                doorArcStartX_ = axisX_.positionMm();
-                doorArm_.move(doorArmExtendSteps_);
+        }
+        case 1: // Türarm ausfahren
+            if (!doorArm_.isMoving()) {
+                axisZ_.moveTo(doorZApproachMm_ + doorHookDropMm_);
                 doorPhase_ = 2;
             }
             break;
-        case 2: // Arm ausfahren → Tür greifen
-            if (!doorArm_.isMoving()) {
-                axisZ_.moveTo(doorOrigStartZ_);
-                doorPhase_ = 3;
-            }
-            break;
-        case 3: // Z anheben → eingehakt
+        case 2: // Z anheben → Mechanismus einhaken
             if (axisZ_.update()) {
                 doorArcStep_ = 0;
-                doorPhase_   = 4;
+                doorPhase_   = 3;
             }
             break;
-        case 4: { // Kreisbogen öffnen: Sub-Schritte 0 → doorArcTotalSteps_
+        case 3: { // Kreisbogen öffnen: Waypoints 0 → doorArcTotalSteps_
             if (doorArm_.isMoving() || axisX_.isMoving()) {
                 axisX_.update();
                 break;
             }
             if (doorArcStep_ > doorArcTotalSteps_) {
-                axisZ_.moveTo(doorOrigStartZ_ - doorHookDropMm_);
-                doorPhase_ = 5;
+                axisZ_.moveTo(doorZApproachMm_);
+                doorPhase_ = 4;
                 break;
             }
             const float   theta     = (float)doorArcStep_ / (float)doorArcTotalSteps_ * doorTargetAngleRad_;
@@ -691,20 +690,20 @@ void AppController::updateOpenDoor() {
             doorArcStep_++;
             break;
         }
-        case 5: // Z absenken → ausgehakt
+        case 4: // Z absenken → Mechanismus aushaken
             if (axisZ_.update()) {
                 doorArm_.move(-doorArm_.stepPosition());
-                doorPhase_ = 6;
+                doorPhase_ = 5;
             }
             break;
-        case 6: // Arm einfahren
+        case 5: // Türarm einfahren
             if (!doorArm_.isMoving()) {
                 axisX_.moveTo(doorOrigStartX_);
                 axisZ_.moveTo(doorOrigStartZ_);
-                doorPhase_ = 7;
+                doorPhase_ = 6;
             }
             break;
-        case 7: { // Schlitten zurück zur Ausgangsposition (X und Z gleichzeitig)
+        case 6: { // Rückfahrt zur Ausgangsposition (X und Z gleichzeitig)
             const bool xDone = axisX_.update();
             const bool zDone = axisZ_.update();
             if (xDone && zDone) {
@@ -732,42 +731,39 @@ void AppController::updateCloseDoor() {
     if (state_ != AppState::BusyCloseDoor) return;
 
     switch (doorPhase_) {
-        case 0: // Z absenken (gestartet in handleCloseDoor)
-            if (axisZ_.update()) {
-                axisX_.moveTo(doorOrigStartX_ + doorXApproachMm_);
-                doorPhase_ = 1;
-            }
-            break;
-        case 1: // X zum Drucker vorfahren
-            if (axisX_.update()) {
+        case 0: { // XZ-Anfahrposition (gestartet in handleCloseDoor)
+            const bool xDone = axisX_.update();
+            const bool zDone = axisZ_.update();
+            if (xDone && zDone) {
                 doorArcStartX_ = axisX_.positionMm();
-                // Grifftiefe bei geöffneter Tür: arm_extend + R * sin(angle)
+                // Arm auf Grifftiefe bei geöffneter Tür: arm_extend + R·sin(angle)
                 const int32_t fullGripSteps = doorArmExtendSteps_ +
                     (int32_t)(doorRadiusMm_ * sinf(doorTargetAngleRad_) * Config::DoorArm::STEPS_PER_MM);
                 doorArm_.move(fullGripSteps);
+                doorPhase_ = 1;
+            }
+            break;
+        }
+        case 1: // Türarm auf Grifftiefe der geöffneten Tür ausfahren
+            if (!doorArm_.isMoving()) {
+                axisZ_.moveTo(doorZApproachMm_ + doorHookDropMm_);
                 doorPhase_ = 2;
             }
             break;
-        case 2: // Arm ausfahren → Tür greifen
-            if (!doorArm_.isMoving()) {
-                axisZ_.moveTo(doorOrigStartZ_);
-                doorPhase_ = 3;
-            }
-            break;
-        case 3: // Z anheben → eingehakt
+        case 2: // Z anheben → Mechanismus einhaken
             if (axisZ_.update()) {
                 doorArcStep_ = doorArcTotalSteps_;
-                doorPhase_   = 4;
+                doorPhase_   = 3;
             }
             break;
-        case 4: { // Kreisbogen schließen: Sub-Schritte doorArcTotalSteps_ → 0
+        case 3: { // Kreisbogen schließen: Waypoints doorArcTotalSteps_ → 0
             if (doorArm_.isMoving() || axisX_.isMoving()) {
                 axisX_.update();
                 break;
             }
             if (doorArcStep_ < 0) {
-                axisZ_.moveTo(doorOrigStartZ_ - doorHookDropMm_);
-                doorPhase_ = 5;
+                axisZ_.moveTo(doorZApproachMm_);
+                doorPhase_ = 4;
                 break;
             }
             const float   theta     = (float)doorArcStep_ / (float)doorArcTotalSteps_ * doorTargetAngleRad_;
@@ -782,20 +778,20 @@ void AppController::updateCloseDoor() {
             doorArcStep_--;
             break;
         }
-        case 5: // Z absenken → ausgehakt
+        case 4: // Z absenken → Mechanismus aushaken
             if (axisZ_.update()) {
                 doorArm_.move(-doorArm_.stepPosition());
-                doorPhase_ = 6;
+                doorPhase_ = 5;
             }
             break;
-        case 6: // Arm einfahren
+        case 5: // Türarm einfahren
             if (!doorArm_.isMoving()) {
                 axisX_.moveTo(doorOrigStartX_);
                 axisZ_.moveTo(doorOrigStartZ_);
-                doorPhase_ = 7;
+                doorPhase_ = 6;
             }
             break;
-        case 7: { // Schlitten zurück zur Ausgangsposition (X und Z gleichzeitig)
+        case 6: { // Rückfahrt zur Ausgangsposition (X und Z gleichzeitig)
             const bool xDone = axisX_.update();
             const bool zDone = axisZ_.update();
             if (xDone && zDone) {

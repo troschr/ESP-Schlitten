@@ -107,16 +107,17 @@ private:
 
     // Open / Close Door (Kreisbogen)
     uint8_t  doorPhase_           = 0;
-    int      doorArcStep_         = 0;   // aktueller Sub-Schritt
-    int      doorArcTotalSteps_   = 0;   // Gesamtzahl Sub-Schritte
+    int      doorArcStep_         = 0;   // aktueller Sub-Schritt (CLOSE_DOOR)
+    int      doorArcTotalSteps_   = 0;   // Gesamtzahl Sub-Schritte (CLOSE_DOOR)
     float    doorRadiusMm_        = 0.0f;
     float    doorTargetAngleRad_  = 0.0f;
     int32_t  doorArmExtendSteps_  = 0;   // Grifftiefe in Schritten
     float    doorOrigStartX_      = 0.0f; // X bei Befehlsempfang → Rückfahrtziel
     float    doorOrigStartZ_      = 0.0f; // Z bei Befehlsempfang → Rückfahrtziel
-    float    doorArcStartX_       = 0.0f; // X nach x_approach → Bogenmittelpunkt-Referenz
-    float    doorHookDropMm_      = 0.0f; // Z-Absenkweg zum Einhaken
-    float    doorXApproachMm_     = 0.0f; // X-Versatz nach hook_drop (Richtung Drucker)
+    float    doorArcStartX_       = 0.0f; // X nach Anfahrposition → Bogenmittelpunkt-Referenz
+    float    doorHookDropMm_      = 0.0f; // Z-Versatz zum Einhaken
+    float    doorXApproachMm_     = 0.0f; // absolute X-Anfahrposition
+    float    doorZApproachMm_     = 0.0f; // absolute Z-Anfahrposition
     uint32_t pendingDoorCmdId_    = 0;
     uint32_t doorStartMs_         = 0;
 

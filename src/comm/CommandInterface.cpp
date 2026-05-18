@@ -72,11 +72,11 @@ Command CommandInterface::parseLine(String line) const {
     return cmd;
   }
 
-  // Zeile in bis zu 8 Felder zerlegen
-  String fields[8];
+  // Zeile in bis zu 9 Felder zerlegen
+  String fields[9];
   uint8_t fieldCount = 0;
   int start = 0;
-  while (start <= static_cast<int>(line.length()) && fieldCount < 8) {
+  while (start <= static_cast<int>(line.length()) && fieldCount < 9) {
     int delim = line.indexOf(';', start);
     if (delim < 0) {
       fields[fieldCount++] = line.substring(start);
@@ -169,10 +169,11 @@ Command CommandInterface::parseLine(String line) const {
     return cmd;
   }
 
-  // --- OPEN_DOOR;arm_extend=<mm>;radius=<mm>;angle=<deg> ---
+  // --- OPEN_DOOR;x_approach=<mm>;z_approach=<mm>;arm_extend=<mm>;radius=<mm>;angle=<deg>;hook_drop=<mm> ---
   if (verb == "OPEN_DOOR") {
     cmd.type = CommandType::OpenDoor;
     bool hasExtend = false, hasRadius = false, hasAngle = false;
+    bool hasXApproach = false, hasZApproach = false;
     for (uint8_t i = 3; i < fieldCount; ++i) {
       String key, value;
       if (!parseKeyValue(fields[i], key, value)) {
@@ -180,14 +181,15 @@ Command CommandInterface::parseLine(String line) const {
         return cmd;
       }
       key.toLowerCase();
-      if      (key == "arm_extend") { cmd.armExtendMm  = (int32_t)value.toInt(); hasExtend = true; }
-      else if (key == "radius")     { cmd.radiusMm      = (int32_t)value.toInt(); hasRadius = true; }
-      else if (key == "angle")      { cmd.openAngleDeg  = (int32_t)value.toInt(); hasAngle  = true; }
+      if      (key == "arm_extend") { cmd.armExtendMm  = (int32_t)value.toInt(); hasExtend    = true; }
+      else if (key == "radius")     { cmd.radiusMm      = (int32_t)value.toInt(); hasRadius    = true; }
+      else if (key == "angle")      { cmd.openAngleDeg  = (int32_t)value.toInt(); hasAngle     = true; }
       else if (key == "hook_drop")  { cmd.hookDropMm    = (int32_t)value.toInt(); }
-      else if (key == "x_approach") { cmd.xApproachMm   = (int32_t)value.toInt(); }
+      else if (key == "x_approach") { cmd.xApproachMm   = (int32_t)value.toInt(); hasXApproach = true; }
+      else if (key == "z_approach") { cmd.zApproachMm   = (int32_t)value.toInt(); hasZApproach = true; }
       else { cmd.parseError = ErrorCode::InvalidCommand; return cmd; }
     }
-    if (!hasExtend || !hasRadius || !hasAngle) {
+    if (!hasExtend || !hasRadius || !hasAngle || !hasXApproach || !hasZApproach) {
       cmd.parseError = ErrorCode::InvalidCommand;
       return cmd;
     }
@@ -195,10 +197,11 @@ Command CommandInterface::parseLine(String line) const {
     return cmd;
   }
 
-  // --- CLOSE_DOOR;arm_extend=<mm>;radius=<mm>;angle=<deg> ---
+  // --- CLOSE_DOOR;x_approach=<mm>;z_approach=<mm>;arm_extend=<mm>;radius=<mm>;angle=<deg>;hook_drop=<mm> ---
   if (verb == "CLOSE_DOOR") {
     cmd.type = CommandType::CloseDoor;
     bool hasExtend = false, hasRadius = false, hasAngle = false;
+    bool hasXApproach = false, hasZApproach = false;
     for (uint8_t i = 3; i < fieldCount; ++i) {
       String key, value;
       if (!parseKeyValue(fields[i], key, value)) {
@@ -206,14 +209,15 @@ Command CommandInterface::parseLine(String line) const {
         return cmd;
       }
       key.toLowerCase();
-      if      (key == "arm_extend") { cmd.armExtendMm  = (int32_t)value.toInt(); hasExtend = true; }
-      else if (key == "radius")     { cmd.radiusMm      = (int32_t)value.toInt(); hasRadius = true; }
-      else if (key == "angle")      { cmd.openAngleDeg  = (int32_t)value.toInt(); hasAngle  = true; }
+      if      (key == "arm_extend") { cmd.armExtendMm  = (int32_t)value.toInt(); hasExtend    = true; }
+      else if (key == "radius")     { cmd.radiusMm      = (int32_t)value.toInt(); hasRadius    = true; }
+      else if (key == "angle")      { cmd.openAngleDeg  = (int32_t)value.toInt(); hasAngle     = true; }
       else if (key == "hook_drop")  { cmd.hookDropMm    = (int32_t)value.toInt(); }
-      else if (key == "x_approach") { cmd.xApproachMm   = (int32_t)value.toInt(); }
+      else if (key == "x_approach") { cmd.xApproachMm   = (int32_t)value.toInt(); hasXApproach = true; }
+      else if (key == "z_approach") { cmd.zApproachMm   = (int32_t)value.toInt(); hasZApproach = true; }
       else { cmd.parseError = ErrorCode::InvalidCommand; return cmd; }
     }
-    if (!hasExtend || !hasRadius || !hasAngle) {
+    if (!hasExtend || !hasRadius || !hasAngle || !hasXApproach || !hasZApproach) {
       cmd.parseError = ErrorCode::InvalidCommand;
       return cmd;
     }

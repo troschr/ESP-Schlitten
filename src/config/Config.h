@@ -59,7 +59,7 @@ namespace DoorArm {
     constexpr uint32_t DIR_US               = 1;
     constexpr uint32_t STEP_DELAY_US        = 1500;
     constexpr uint32_t HOMING_STEP_DELAY_US = 1500;
-    constexpr uint32_t ARC_STEPS_PER_DEG    = 1;      // Sub-Schritte pro Grad Öffnungswinkel
+    constexpr uint32_t ARC_STEPS_PER_DEG    = 1;      // Waypoints pro Grad Öffnungswinkel (höher = glatter)
     constexpr uint32_t ARC_STEP_DELAY_US    = 3000;   // Step-Delay Türarm während Kreisbogen (µs, höher = langsamer)
 }
 

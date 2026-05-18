@@ -43,8 +43,8 @@ CMD;<id>;<befehl>[;<key>=<value>...]
 | MOVE_TO | `CMD;<id>;MOVE_TO;x=<mm>;z=<mm>` | `READY` oder `STOPPED`, referenziert | ✅ |
 | RESET_ERROR | `CMD;<id>;RESET_ERROR` | nur in `ERROR` | ✅ |
 | HOME_SWITCH_HIT | `CMD;<id>;HOME_SWITCH_HIT;axis=<X\|Z>` | nur in `BUSY_HOMING` oder `BUSY_MOVE_HOME` | ✅ |
-| OPEN_DOOR | `CMD;<id>;OPEN_DOOR;arm_extend=<mm>;radius=<mm>;angle=<deg>;hook_drop=<mm>;x_approach=<mm>` | `READY` oder `STOPPED`, referenziert | ✅ |
-| CLOSE_DOOR | `CMD;<id>;CLOSE_DOOR;arm_extend=<mm>;radius=<mm>;angle=<deg>;hook_drop=<mm>;x_approach=<mm>` | `READY` oder `STOPPED`, referenziert | ✅ |
+| OPEN_DOOR | `CMD;<id>;OPEN_DOOR;x_approach=<mm>;z_approach=<mm>;arm_extend=<mm>;radius=<mm>;angle=<deg>;hook_drop=<mm>` | `READY` oder `STOPPED`, referenziert | ✅ |
+| CLOSE_DOOR | `CMD;<id>;CLOSE_DOOR;x_approach=<mm>;z_approach=<mm>;arm_extend=<mm>;radius=<mm>;angle=<deg>;hook_drop=<mm>` | `READY` oder `STOPPED`, referenziert | ✅ |
 | PICKUP | `CMD;<id>;PICKUP;gripper_depth=<mm>;lift_offset=<mm>` | `READY` oder `STOPPED`, referenziert | ✅ |
 | DEPOSIT | `CMD;<id>;DEPOSIT;gripper_depth=<mm>;lift_offset=<mm>` | `READY` oder `STOPPED`, referenziert | ✅ |
 
@@ -56,9 +56,9 @@ Der Pi schickt dieses Kommando, sobald er an seinem GPIO-Eingang einen Endschalt
 
 Das Kommando ist **nur in den Zuständen `BUSY_HOMING` und `BUSY_MOVE_HOME` gültig**. In jedem anderen Zustand antwortet der ESP mit `ERR;INVALID_STATE`.
 
-| Feld | Typ | Pflicht | Bedeutung |
-|---|---|---|---|
-| `axis` | enum | ja | Achse, deren Endschalter ausgelöst hat: `X` oder `Z` |
+| Feld | Typ | Bedeutung |
+|---|---|---|
+| `axis` | enum | Achse, deren Endschalter ausgelöst hat: `X` oder `Z` |
 
 Beispiel:
 ```
@@ -77,6 +77,8 @@ Der ESP homt alle vier Motoren parallel bzw. überlappend:
 
 `HOME_DONE` wird erst gesendet, wenn **alle vier** Motoren referenziert sind.
 
+> **Türarm-Homeposition = 0 mm.** Der Türarm wird nach jedem OPEN_DOOR- und CLOSE_DOOR-Befehl vollständig eingefahren und kehrt dabei auf 0 mm zurück. Das ist dieselbe Position, die beim Homing durch den Endschalter definiert wird. Alle Arm-Schritte werden relativ zu diesem Nullpunkt gezählt.
+
 ---
 
 ### ✅ Parameter PICKUP
@@ -88,10 +90,10 @@ Der Schlitten steht bereits auf der Zielposition (direkt vor dem Drucker/Stellpl
 2. Schlitten hebt um `lift_offset` mm nach oben → Platte liegt auf der Gabel
 3. Greifer fährt ein → Schlitten bereit zum Weiterfahren
 
-| Feld | Typ | Pflicht | Bedeutung |
-|---|---|---|---|
-| `gripper_depth` | int (mm) | ja | Wie weit der Greifer ausfährt (druckerspezifisch) |
-| `lift_offset` | int (mm) | ja | Wie weit der Schlitten nach dem Ausfahren anhebt, um die Platte aufzunehmen |
+| Feld | Typ | Bedeutung |
+|---|---|---|
+| `gripper_depth` | int (mm) | Wie weit der Greifer ausfährt (druckerspezifisch) |
+| `lift_offset` | int (mm) | Wie weit der Schlitten nach dem Ausfahren anhebt, um die Platte aufzunehmen |
 
 Beispiel:
 ```
@@ -110,10 +112,10 @@ Der Schlitten steht bereits auf der Zielposition (direkt vor Drucker/Stellplatz)
 3. Schlitten senkt um `lift_offset` mm → Platte liegt auf
 4. Greifer fährt ein
 
-| Feld | Typ | Pflicht | Bedeutung |
-|---|---|---|---|
-| `gripper_depth` | int (mm) | ja | Wie weit der Greifer ausfährt (zielspezifisch) |
-| `lift_offset` | int (mm) | ja | Wie weit der Schlitten zunächst anhebt, um die Platte über der Stellfläche zu positionieren |
+| Feld | Typ | Bedeutung |
+|---|---|---|
+| `gripper_depth` | int (mm) | Wie weit der Greifer ausfährt (zielspezifisch) |
+| `lift_offset` | int (mm) | Wie weit der Schlitten zunächst anhebt, um die Platte über der Stellfläche zu positionieren |
 
 Beispiel:
 ```
@@ -129,10 +131,10 @@ Beide Achsen werden immer gemeinsam angegeben – der ESP fährt zur angegebenen
 **Sonderfall: Start aus der Home-Position (x=0, z=0)**  
 Wenn der Schlitten an der Home-Position steht, führt der ESP vor der eigentlichen Fahrt automatisch einen **Z-Scan** durch: Die Z-Achse fährt zunächst die komplette Verfahrlänge nach oben (`MAX_TRAVEL_MM`), während der TF-Luna kontinuierlich auf Hindernisse prüft. Erst wenn der Scan abgeschlossen ist und kein Hindernis gefunden wurde, startet die Fahrt zur eigentlichen Zielposition. Der Zustand während des Scans ist `BUSY_SCANNING`.
 
-| Feld | Typ | Pflicht | Bedeutung |
-|---|---|---|---|
-| `x` | int | ja | Zielposition X-Achse in mm |
-| `z` | int | ja | Zielposition Z-Achse in mm |
+| Feld | Typ | Bedeutung |
+|---|---|---|
+| `x` | int | Zielposition X-Achse in mm |
+| `z` | int | Zielposition Z-Achse in mm |
 
 Beispiel:
 ```
@@ -160,7 +162,7 @@ CMD;<id>;MOVE_HOME
 
 ### ✅ Parameter OPEN_DOOR
 
-Der Schlitten steht bereits auf der Zielposition vor dem Drucker. Der Türarm und die X-Achse führen gemeinsam eine Kreisbewegung aus, um die Tür zu öffnen.
+Der Schlitten steht in seiner Ausgangsposition (z.B. Bereitschaftsposition neben dem Drucker). Der ESP fährt zunächst eine definierte Anfahrposition an, greift dort die Tür und führt dann den Kreisbogen aus.
 
 **Geometrie:**
 - Türarm fährt senkrecht zur Schlittenfahrtrichtung (Y-Achse)
@@ -168,55 +170,59 @@ Der Schlitten steht bereits auf der Zielposition vor dem Drucker. Der Türarm un
 - Bei Öffnungswinkel θ: `arm(θ) = arm_extend + radius · sin(θ)`, `Δx(θ) = radius · (cos(θ) − 1)`
 
 **Ablauf (ESP-intern):**
-1. Z-Achse fährt `hook_drop` mm nach **unten** → Einhakmechanismus kommt in Position
-2. X-Achse fährt `x_approach` mm vor (Richtung Drucker)
-3. Türarm fährt `arm_extend` mm aus → Arm ist in Türhöhe
-4. Z-Achse fährt `hook_drop` mm nach **oben** → Mechanismus hakt in die Tür ein
-5. Kreisbogen öffnen: `angle`-Grad in 1°-Sub-Schritten, Arm und X-Achse gleichzeitig
-6. Z-Achse fährt `hook_drop` mm nach **unten** → Mechanismus hakt aus
-7. Türarm fährt ein
-8. Schlitten kehrt zur Ausgangsposition zurück (X und Z gleichzeitig)
+1. Schlitten fährt Anfahrposition an: X nach `x_approach`, Z nach `z_approach` (gleichzeitig)
+2. Türarm fährt `arm_extend` mm aus
+3. Z-Achse fährt `hook_drop` mm nach **oben** → Mechanismus hakt in die Tür ein
+4. Kreisbogen öffnen: Türarm läuft mit konstanter Geschwindigkeit, X-Achse folgt
+5. Z-Achse fährt `hook_drop` mm nach **unten** → Mechanismus hakt aus
+6. Türarm fährt ein
+7. Schlitten kehrt zur Ausgangsposition zurück (X und Z gleichzeitig)
 
-| Feld | Typ | Pflicht | Bedeutung |
-|---|---|---|---|
-| `arm_extend` | int (mm) | ja | Wie weit der Arm ausfährt um die Tür zu greifen |
-| `radius` | int (mm) | ja | Radius der Kreisbewegung (Scharnier → Greifpunkt) |
-| `angle` | int (°) | ja | Öffnungswinkel der Tür (z.B. 90, 160, 180) |
-| `hook_drop` | int (mm) | ja | Z-Versatz für den Einhakmechanismus (0 = kein Versatz) |
-| `x_approach` | int (mm) | ja | X-Versatz vor dem Armausfahren (Richtung Drucker; kann negativ sein) |
+| Feld | Typ | Bedeutung |
+|---|---|---|
+| `x_approach` | int (mm) | Absolute X-Zielposition der Anfahrposition |
+| `z_approach` | int (mm) | Absolute Z-Zielposition der Anfahrposition |
+| `arm_extend` | int (mm) | Wie weit der Arm ausfährt um die Tür zu greifen |
+| `radius` | int (mm) | Radius der Kreisbewegung (Scharnier → Greifpunkt) |
+| `angle` | int (°) | Öffnungswinkel der Tür (z.B. 90, 160, 180) |
+| `hook_drop` | int (mm) | Z-Versatz für den Einhakmechanismus; 0 = kein Versatz |
 
 Beispiel:
 ```
-CMD;7;OPEN_DOOR;arm_extend=30;radius=150;angle=160;hook_drop=15;x_approach=20
+CMD;7;OPEN_DOOR;x_approach=370;z_approach=105;arm_extend=30;radius=150;angle=160;hook_drop=15
 ```
 
 ---
 
 ### ✅ Parameter CLOSE_DOOR
 
-Der Schlitten steht auf der Startposition des Schließbogens: `x_approach + radius · (cos(angle) − 1)`. Pi positioniert den Schlitten vorher per `MOVE_TO`.
+Der Schlitten steht in seiner Ausgangsposition (Tür ist offen). Der Pi übergibt die absolute Anfahrposition, die dem Ende des OPEN_DOOR-Kreisbogens entspricht.
+
+> **Hinweis für den Pi:** Die Anfahr-X-Position lässt sich aus den OPEN_DOOR-Parametern berechnen:  
+> `x_close_approach = x_open_approach + radius · (cos(angle) − 1)`  
+> (für typische Öffnungswinkel > 0° ist dieser Wert kleiner als `x_open_approach`, d.h. der Schlitten ist weiter in Richtung Drucker gefahren)
 
 **Ablauf (ESP-intern):**
-1. Z-Achse fährt `hook_drop` mm nach **unten** → Einhakmechanismus in Position
-2. X-Achse fährt `x_approach` mm vor (Richtung Drucker)
-3. Türarm fährt auf Grifftiefe bei geöffneter Tür: `arm_extend + radius · sin(angle)` mm
-4. Z-Achse fährt `hook_drop` mm nach **oben** → eingehakt
-5. Kreisbogen schließen: `angle`-Grad in 1°-Sub-Schritten rückwärts
-6. Z-Achse fährt `hook_drop` mm nach **unten** → ausgehakt
-7. Türarm fährt ein
-8. Schlitten kehrt zur Ausgangsposition zurück (X und Z gleichzeitig)
+1. Schlitten fährt Anfahrposition an: X nach `x_approach`, Z nach `z_approach` (gleichzeitig)
+2. Türarm fährt auf Grifftiefe bei geöffneter Tür aus: `arm_extend + radius · sin(angle)` mm
+3. Z-Achse fährt `hook_drop` mm nach **oben** → Mechanismus hakt in die Tür ein
+4. Kreisbogen schließen: Türarm läuft rückwärts mit konstanter Geschwindigkeit, X-Achse folgt
+5. Z-Achse fährt `hook_drop` mm nach **unten** → Mechanismus hakt aus
+6. Türarm fährt ein
+7. Schlitten kehrt zur Ausgangsposition zurück (X und Z gleichzeitig)
 
-| Feld | Typ | Pflicht | Bedeutung |
-|---|---|---|---|
-| `arm_extend` | int (mm) | ja | Wie weit der Arm ausfährt um die Tür zu greifen |
-| `radius` | int (mm) | ja | Radius der Kreisbewegung (gleicher Wert wie bei OPEN_DOOR) |
-| `angle` | int (°) | ja | Aktueller Öffnungswinkel (gleicher Wert wie bei OPEN_DOOR) |
-| `hook_drop` | int (mm) | ja | Z-Versatz für den Einhakmechanismus (gleicher Wert wie bei OPEN_DOOR) |
-| `x_approach` | int (mm) | ja | X-Versatz vor dem Armausfahren (gleicher Wert wie bei OPEN_DOOR) |
+| Feld | Typ | Bedeutung |
+|---|---|---|
+| `x_approach` | int (mm) | Absolute X-Zielposition der Anfahrposition = Ende des OPEN-Bogens |
+| `z_approach` | int (mm) | Absolute Z-Zielposition der Anfahrposition |
+| `arm_extend` | int (mm) | Grifftiefe des Arms (gleicher Wert wie bei OPEN_DOOR) |
+| `radius` | int (mm) | Radius der Kreisbewegung (gleicher Wert wie bei OPEN_DOOR) |
+| `angle` | int (°) | Aktueller Öffnungswinkel (gleicher Wert wie bei OPEN_DOOR) |
+| `hook_drop` | int (mm) | Z-Versatz für den Einhakmechanismus; 0 = kein Versatz |
 
-Beispiel:
+Beispiel (angle=160°, radius=150, x_open_approach=370 → x_close_approach ≈ 370 + 150·(cos(160°)−1) ≈ 79):
 ```
-CMD;10;CLOSE_DOOR;arm_extend=30;radius=150;angle=160;hook_drop=15;x_approach=20
+CMD;10;CLOSE_DOOR;x_approach=79;z_approach=105;arm_extend=30;radius=150;angle=160;hook_drop=15
 ```
 
 ---
@@ -503,18 +509,17 @@ Schlitten steht auf Zielposition (Stellplatz oder Drucker), trägt eine Platte.
 
 ### Tür öffnen (OPEN_DOOR)
 
-Schlitten steht bereits auf der Anfahrposition vor dem Drucker (READY).
+Schlitten steht in Ausgangsposition (READY). Pi übergibt die absolute Anfahrposition.
 
 ```
-→ CMD;7;OPEN_DOOR;arm_extend=30;radius=150;angle=160;hook_drop=15;x_approach=20
+→ CMD;7;OPEN_DOOR;x_approach=370;z_approach=105;arm_extend=30;radius=150;angle=160;hook_drop=15
 ← RSP;7;ACK
 ← EVT;0;STATE;BUSY_OPEN_DOOR;ref=1;x=350;z=120
-  [ESP fährt Z 15 mm runter → Einhakmechanismus in Position]
-  [ESP fährt X 20 mm vor → x=370]
+  [ESP fährt X nach 370, Z nach 105 (gleichzeitig)]
   [ESP fährt Türarm 30 mm aus]
-  [ESP fährt Z 15 mm hoch → eingehakt, z=120]
-  [ESP fährt Kreisbogen: 160 Sub-Schritte à 1°, Arm und X gemeinsam]
-  [ESP fährt Z 15 mm runter → ausgehakt]
+  [ESP fährt Z 15 mm hoch → z=120, eingehakt]
+  [ESP fährt Kreisbogen: Arm konstante Drehzahl, X folgt]
+  [ESP fährt Z 15 mm runter → z=105, ausgehakt]
   [ESP fährt Türarm ein]
   [ESP fährt Schlitten zurück zu x=350, z=120]
 ← EVT;7;OK;DOOR_OPEN_DONE;x=350;z=120
@@ -523,27 +528,22 @@ Schlitten steht bereits auf der Anfahrposition vor dem Drucker (READY).
 
 ### Tür schließen (CLOSE_DOOR)
 
-Pi positioniert Schlitten vorher auf x = x_approach + radius·(cos(angle)−1).  
-Für angle=160°, radius=150: x = 350 + 150·(cos(160°)−1) ≈ 350 − 291 = 59 mm.
+Schlitten steht in Ausgangsposition (READY). Pi berechnet und übergibt die Anfahrposition.  
+Für angle=160°, radius=150, x_open_approach=370: x_close_approach = 370 + 150·(cos(160°)−1) ≈ 79 mm.
 
 ```
-→ CMD;9;MOVE_TO;x=59;z=120
-← RSP;9;ACK
-← EVT;9;OK;MOVE_DONE;x=59;z=120
-← EVT;0;STATE;READY;ref=1;x=59;z=120
-→ CMD;10;CLOSE_DOOR;arm_extend=30;radius=150;angle=160;hook_drop=15;x_approach=20
+→ CMD;10;CLOSE_DOOR;x_approach=79;z_approach=105;arm_extend=30;radius=150;angle=160;hook_drop=15
 ← RSP;10;ACK
-← EVT;0;STATE;BUSY_CLOSE_DOOR;ref=1;x=59;z=120
-  [ESP fährt Z 15 mm runter → Einhakmechanismus in Position]
-  [ESP fährt X 20 mm vor → x=79]
+← EVT;0;STATE;BUSY_CLOSE_DOOR;ref=1;x=350;z=120
+  [ESP fährt X nach 79, Z nach 105 (gleichzeitig)]
   [ESP fährt Türarm auf Grifftiefe: 30 + 150·sin(160°) ≈ 81 mm]
-  [ESP fährt Z 15 mm hoch → eingehakt, z=120]
-  [ESP fährt Kreisbogen rückwärts: 160 Sub-Schritte à 1°, Arm und X gemeinsam]
-  [ESP fährt Z 15 mm runter → ausgehakt]
+  [ESP fährt Z 15 mm hoch → z=120, eingehakt]
+  [ESP fährt Kreisbogen rückwärts: Arm konstante Drehzahl, X folgt]
+  [ESP fährt Z 15 mm runter → z=105, ausgehakt]
   [ESP fährt Türarm ein]
-  [ESP fährt Schlitten zurück zu x=59, z=120]
-← EVT;10;OK;DOOR_CLOSE_DONE;x=59;z=120
-← EVT;0;STATE;READY;ref=1;x=59;z=120
+  [ESP fährt Schlitten zurück zu x=350, z=120]
+← EVT;10;OK;DOOR_CLOSE_DONE;x=350;z=120
+← EVT;0;STATE;READY;ref=1;x=350;z=120
 ```
 
 ---
