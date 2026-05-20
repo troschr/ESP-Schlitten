@@ -1,10 +1,10 @@
-// Vier-Achsen-Test: 2x CL42T (X/Y, Trapezrampe) + 2x DRV8825 (Greifer/Tür, ein/aus)
+// Vier-Achsen-Test: 2x CL42T (X/Z, Trapezrampe) + 2x DRV8825 (Greifer/Türarm, ein/aus)
 //
-// Pinbelegung:
-//   CL42T  X:       STEP=27  DIR=14  EN=12  ALM=13
-//   CL42T  Y:       STEP=32  DIR=33  EN=25  ALM=26
-//   DRV8825 Greifer: STEP=23  DIR=19  EN=18
-//   DRV8825 Tür:     STEP=17  DIR=16  EN=15
+// Pinbelegung (aus Pins.h):
+//   CL42T  X (horizontal): STEP=27  DIR=14  EN=12  ALM=13
+//   CL42T  Z (vertikal):   STEP=32  DIR=33  EN=25  ALM=26
+//   DRV8825 Greifer:        STEP=23  DIR=19  EN=18
+//   DRV8825 Türarm:         STEP=17  DIR=16  EN=15
 //   (CL42T: PUL-/DIR-/ENA- an GND, Einzelendsignal optoentkoppelt)
 //   (DRV8825: 3.3V an VDD/RST/SLP, ext. 12V an VMOT)
 //
@@ -28,26 +28,26 @@
 constexpr uint16_t CL_STEPS_PER_REV = 800;
 
 // ── Schritte pro Millimeter ─────────────────────────────────────────
-constexpr float STEPS_PER_MM_X = 160.0f;
-constexpr float STEPS_PER_MM_Y = 160.0f;
+constexpr float STEPS_PER_MM_X = 800.0f;
+constexpr float STEPS_PER_MM_Y = 800.0f;
 
 // ── Geschwindigkeit & Rampe – Achse X ──────────────────────────────
-constexpr uint16_t X_MAX_SPEED_RPM   = 300;
-constexpr uint16_t X_START_SPEED_RPM = 20;
-constexpr uint32_t X_ACCEL_STEPS     = 4000;
+constexpr uint16_t X_MAX_SPEED_RPM   = 100;
+constexpr uint16_t X_START_SPEED_RPM = 10;
+constexpr uint32_t X_ACCEL_STEPS     = 2000;
 
 // ── Geschwindigkeit & Rampe – Achse Y ──────────────────────────────
-constexpr uint16_t Y_MAX_SPEED_RPM   = 300;
-constexpr uint16_t Y_START_SPEED_RPM = 20;
-constexpr uint32_t Y_ACCEL_STEPS     = 4000;
+constexpr uint16_t Y_MAX_SPEED_RPM   = 100;
+constexpr uint16_t Y_START_SPEED_RPM = 10;
+constexpr uint32_t Y_ACCEL_STEPS     = 2000;
 
 // ── CL42T Timing-Minima ─────────────────────────────────────────────
 constexpr uint32_t CL_T_STEP_US = 3;
 constexpr uint32_t CL_T_DIR_US  = 5;
 
 // ── CL42T Pins ──────────────────────────────────────────────────────
-constexpr uint8_t X_STEP = 27, X_DIR = 14, X_EN = 12, X_ALM = 13;
-constexpr uint8_t Y_STEP = 32, Y_DIR = 33, Y_EN = 25, Y_ALM = 26;
+constexpr uint8_t X_STEP = 27, X_DIR = 14, X_EN = 12, X_ALM = 13;  // X horizontal
+constexpr uint8_t Y_STEP = 32, Y_DIR = 33, Y_EN = 25, Y_ALM = 26;  // Z vertikal (hier als Y)
 
 // ════════════════════════════════════════════════════════════════════
 // DRV8825 – Konfiguration
@@ -56,9 +56,11 @@ constexpr uint8_t Y_STEP = 32, Y_DIR = 33, Y_EN = 25, Y_ALM = 26;
 // ── Schritte pro Umdrehung (abhängig von Mikroschritt-Einstellung) ──
 constexpr uint16_t DRV_STEPS_PER_REV = 200;
 
-// ── Schritte für "ausgefahren" (eine Richtung ab Nullpunkt) ─────────
-constexpr uint32_t GREIFER_TRAVEL_STEPS = 800;  // anpassen
-constexpr uint32_t TUER_TRAVEL_STEPS    = 800;  // anpassen
+// ── Greifer: Schritte pro mm ─────────────────────────────────────────
+constexpr float GREIFER_STEPS_PER_MM = 20.0f;  // anpassen nach Kalibrierung
+
+// ── Schritte für Türarm "ausgefahren" (eine Richtung ab Nullpunkt) ───
+constexpr uint32_t TUER_TRAVEL_STEPS = 800;  // anpassen
 
 // ── Schlitten-Verfahrweg beim Türöffnen [mm] ─────────────────────────
 constexpr float TUER_SCHLITTEN_MM = 50.0f;
@@ -71,8 +73,8 @@ constexpr uint32_t DRV_T_STEP_US = 2;
 constexpr uint32_t DRV_T_DIR_US  = 1;
 
 // ── DRV8825 Pins ────────────────────────────────────────────────────
-constexpr uint8_t GREIFER_STEP = 23, GREIFER_DIR = 19, GREIFER_EN = 18;
-constexpr uint8_t TUER_STEP    = 17, TUER_DIR    = 16, TUER_EN    = 15;
+constexpr uint8_t GREIFER_STEP = 23, GREIFER_DIR = 19, GREIFER_EN = 18;  // Gripper
+constexpr uint8_t TUER_STEP    = 17, TUER_DIR    = 16, TUER_EN    = 15;  // Türarm
 
 // ════════════════════════════════════════════════════════════════════
 // CL42T – Strukturen & Logik
@@ -208,15 +210,16 @@ enum class AktorState { EINGEFAHREN, AUSGEFAHREN };
 struct Aktor {
     const char* name;
     uint8_t     pinStep, pinDir, pinEn;
-    uint32_t    travelSteps;
+    uint32_t    travelSteps;  // für Türarm (ein/aus)
     AktorState  state;
+    float       positionMm;   // für Greifer (mm-Positionierung)
 };
 
 Aktor greifer = { "Greifer", GREIFER_STEP, GREIFER_DIR, GREIFER_EN,
-                  GREIFER_TRAVEL_STEPS, AktorState::EINGEFAHREN };
+                  0, AktorState::EINGEFAHREN, 0.0f };
 
 Aktor tuer    = { "Tuer",    TUER_STEP,    TUER_DIR,    TUER_EN,
-                  TUER_TRAVEL_STEPS,    AktorState::EINGEFAHREN };
+                  TUER_TRAVEL_STEPS, AktorState::EINGEFAHREN, 0.0f };
 
 void initAktor(const Aktor& a) {
     pinMode(a.pinStep, OUTPUT);
@@ -311,6 +314,32 @@ void runAxesAndAktor(ClMotor& mx, ClMotor& my,
     if (moveA1) { digitalWrite(a1.pinEn, HIGH); a1.state = a1Aus ? AktorState::AUSGEFAHREN : AktorState::EINGEFAHREN; }
     if (moveA2) { digitalWrite(a2->pinEn, HIGH); a2->state = a2Aus ? AktorState::AUSGEFAHREN : AktorState::EINGEFAHREN; }
     Serial.println("Zielposition erreicht.");
+}
+
+void moveAktorToMm(Aktor& a, float targetMm) {
+    float delta = targetMm - a.positionMm;
+    if (fabsf(delta) < 0.01f) {
+        Serial.printf("%s: bereits auf %.2f mm\n", a.name, targetMm);
+        return;
+    }
+    uint32_t steps = (uint32_t)(fabsf(delta) * GREIFER_STEPS_PER_MM + 0.5f);
+    bool ausfahren = delta > 0.0f;
+
+    digitalWrite(a.pinEn,  LOW);
+    digitalWrite(a.pinDir, ausfahren ? HIGH : LOW);
+    delayMicroseconds(DRV_T_DIR_US);
+
+    for (uint32_t i = 0; i < steps; i++) {
+        digitalWrite(a.pinStep, HIGH);
+        delayMicroseconds(DRV_T_STEP_US);
+        digitalWrite(a.pinStep, LOW);
+        delayMicroseconds(DRV_STEP_DELAY_US);
+    }
+
+    digitalWrite(a.pinEn, HIGH);
+    a.positionMm = targetMm;
+    Serial.printf("%s: %.2f mm (%lu Schritte, %s)\n",
+                  a.name, targetMm, steps, ausfahren ? ">>" : "<<");
 }
 
 void handleAktor(Aktor& a, const String& arg) {
@@ -408,7 +437,7 @@ void printStatus() {
     Serial.println("  goto <x_mm> <y_mm>   CL42T X+Y verfahren");
     Serial.println("  home all              Alle 4 Achsen homen");
     Serial.println("  home x|y|greifer|tuer Einzelne Achse homen");
-    Serial.println("  greifer ein|aus       Greifer ein-/ausfahren");
+    Serial.println("  greifer <mm>          Greifer auf absolute Position in mm fahren");
     Serial.println("  tuer ein|aus          Tür ein-/ausfahren");
     Serial.println("  tuer oeffnen          Greifer aus → Schlitten+Greifer ein");
     Serial.println("  all go                goto 500/500 + alle 4 Motoren gleichzeitig");
@@ -420,9 +449,9 @@ void printStatus() {
                   axisX.maxRpm, axisX.startRpm, axisX.accelSteps);
     Serial.printf("  Y – Max: %u RPM  Start: %u RPM  Rampe: %lu Schritte\n",
                   axisY.maxRpm, axisY.startRpm, axisY.accelSteps);
-    Serial.printf("  Greifer: %s  |  Tuer: %s\n",
-        greifer.state == AktorState::AUSGEFAHREN ? "ausgefahren" : "eingefahren",
-        tuer.state    == AktorState::AUSGEFAHREN ? "ausgefahren" : "eingefahren");
+    Serial.printf("  Greifer: %.2f mm  |  Tuer: %s\n",
+        greifer.positionMm,
+        tuer.state == AktorState::AUSGEFAHREN ? "ausgefahren" : "eingefahren");
     Serial.printf("  ALM X: %s  |  ALM Y: %s\n",
         digitalRead(X_ALM) == LOW ? "FEHLER" : "OK",
         digitalRead(Y_ALM) == LOW ? "FEHLER" : "OK");
@@ -440,10 +469,10 @@ void handleCommand(const String& raw) {
         String arg = cmd.substring(4);
         arg.trim();
         if (arg == "all" || arg == "") {
-            axisX.positionMm = 0.0f;
-            axisY.positionMm = 0.0f;
-            greifer.state    = AktorState::EINGEFAHREN;
-            tuer.state       = AktorState::EINGEFAHREN;
+            axisX.positionMm   = 0.0f;
+            axisY.positionMm   = 0.0f;
+            greifer.positionMm = 0.0f;
+            tuer.state         = AktorState::EINGEFAHREN;
             Serial.println("Nullpunkt gesetzt: X, Y, Greifer, Tuer.");
         } else if (arg == "x") {
             axisX.positionMm = 0.0f;
@@ -452,7 +481,7 @@ void handleCommand(const String& raw) {
             axisY.positionMm = 0.0f;
             Serial.println("Nullpunkt gesetzt: Y.");
         } else if (arg == "greifer") {
-            greifer.state = AktorState::EINGEFAHREN;
+            greifer.positionMm = 0.0f;
             Serial.println("Nullpunkt gesetzt: Greifer.");
         } else if (arg == "tuer") {
             tuer.state = AktorState::EINGEFAHREN;
@@ -461,7 +490,8 @@ void handleCommand(const String& raw) {
             Serial.println("ERR: home all|x|y|greifer|tuer");
         }
     } else if (cmd.startsWith("greifer ")) {
-        handleAktor(greifer, cmd.substring(8));
+        float mm = cmd.substring(8).toFloat();
+        moveAktorToMm(greifer, mm);
     } else if (cmd == "all go") {
         handleAllGo();
     } else if (cmd == "tuer oeffnen") {
