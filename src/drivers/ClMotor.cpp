@@ -45,17 +45,26 @@ bool ClMotor::moveTo(float targetMm) {
 }
 
 bool ClMotor::moveTo(float targetMm, uint16_t maxRpm) {
-    if (_moving) return false;
-
     int32_t targetSteps = (int32_t)(targetMm * _stepsPerMm + (targetMm >= 0 ? 0.5f : -0.5f));
     int32_t delta       = targetSteps - _positionSteps;
-    if (delta == 0) return true;
+    if (delta == 0) return !_moving;
+
+    const bool     newForward     = delta > 0;
+    const uint32_t halfUsCruise   = (maxRpm > 0) ? rpmToHalfUs(maxRpm) : _dfltHalfUsCruise;
+
+    if (_moving) {
+        if (newForward != _forward) return false;  // Richtungswechsel erst nach Stopp
+        _totalSteps   = (uint32_t)abs(delta);
+        _stepsDone    = min(_stepsDone, _totalSteps);
+        _halfUsCruise = halfUsCruise;
+        return false;
+    }
 
     _totalSteps    = (uint32_t)abs(delta);
-    _forward       = delta > 0;
+    _forward       = newForward;
     _homingMode    = false;
     _stepsDone     = 0;
-    _halfUsCruise  = (maxRpm > 0) ? rpmToHalfUs(maxRpm) : _dfltHalfUsCruise;
+    _halfUsCruise  = halfUsCruise;
     _halfUsStart   = _dfltHalfUsStart;
     _accelSteps    = _dfltAccelSteps;
 
@@ -65,7 +74,7 @@ bool ClMotor::moveTo(float targetMm, uint16_t maxRpm) {
 
     _moving     = true;
     _nextStepUs = micros();
-    return true;
+    return false;
 }
 
 void ClMotor::startHoming(bool forward, uint16_t homingRpm) {

@@ -678,28 +678,26 @@ void AppController::updateOpenDoor() {
                 doorPhase_   = 3;
             }
             break;
-        case 3: { // Kreisbogen öffnen: Waypoints 0 → doorArcTotalSteps_
-            if (doorArm_.isMoving() || axisX_.isMoving()) {
-                axisX_.update();
-                break;
-            }
+        case 3: { // Kreisbogen öffnen: Arm treibt Timing, X folgt ohne Stopp
+            axisX_.update();
+            if (doorArm_.isMoving()) break;
             if (doorArcStep_ > doorArcTotalSteps_) {
                 axisZ_.moveTo(doorZApproachMm_);
                 doorPhase_ = 4;
                 break;
             }
-            const float   theta     = (float)doorArcStep_ / (float)doorArcTotalSteps_ * doorTargetAngleRad_;
-            const int32_t armTarget = doorArmExtendSteps_ +
-                (int32_t)(doorRadiusMm_ * sinf(theta) * Config::DoorArm::STEPS_PER_MM);
-            const float   xTarget   = doorArcStartX_ + doorRadiusMm_ * (cosf(theta) - 1.0f);
-            const int32_t armDelta  = armTarget - doorArm_.stepPosition();
+            const float   theta    = (float)doorArcStep_ / (float)doorArcTotalSteps_ * doorTargetAngleRad_;
+            const int32_t armTgt   = doorArmExtendSteps_ + (int32_t)(doorRadiusMm_ * sinf(theta) * Config::DoorArm::STEPS_PER_MM);
+            const int32_t armDelta = armTgt - doorArm_.stepPosition();
+            const float   xTarget  = doorArcStartX_ + doorRadiusMm_ * (cosf(theta) - 1.0f);
             if (armDelta != 0) doorArm_.move(armDelta, Config::DoorArm::ARC_STEP_DELAY_US);
             axisX_.moveTo(xTarget, Config::MotionX::DOOR_ARC_MAX_RPM);
             axisX_.update();
             doorArcStep_++;
             break;
         }
-        case 4: // Z absenken → Mechanismus aushaken
+        case 4: // Z absenken → Mechanismus aushaken (X holt letzten Waypoint ein)
+            axisX_.update();
             if (axisZ_.update()) {
                 doorArm_.move(-doorArm_.stepPosition());
                 doorPhase_ = 5;
@@ -756,29 +754,26 @@ void AppController::updateCloseDoor() {
                 doorPhase_   = 3;
             }
             break;
-        case 3: { // Kreisbogen schließen: Waypoints doorArcTotalSteps_ → 0
-            if (doorArm_.isMoving() || axisX_.isMoving()) {
-                axisX_.update();
-                break;
-            }
+        case 3: { // Kreisbogen schließen: Arm treibt Timing, X folgt ohne Stopp
+            axisX_.update();
+            if (doorArm_.isMoving()) break;
             if (doorArcStep_ < 0) {
                 axisZ_.moveTo(doorZApproachMm_);
                 doorPhase_ = 4;
                 break;
             }
-            const float   theta     = (float)doorArcStep_ / (float)doorArcTotalSteps_ * doorTargetAngleRad_;
-            const int32_t armTarget = doorArmExtendSteps_ +
-                (int32_t)(doorRadiusMm_ * sinf(theta) * Config::DoorArm::STEPS_PER_MM);
-            const float   xTarget   = doorArcStartX_ +
-                doorRadiusMm_ * (cosf(theta) - cosf(doorTargetAngleRad_));
-            const int32_t armDelta  = armTarget - doorArm_.stepPosition();
+            const float   theta    = (float)doorArcStep_ / (float)doorArcTotalSteps_ * doorTargetAngleRad_;
+            const int32_t armTgt   = doorArmExtendSteps_ + (int32_t)(doorRadiusMm_ * sinf(theta) * Config::DoorArm::STEPS_PER_MM);
+            const int32_t armDelta = armTgt - doorArm_.stepPosition();
+            const float   xTarget  = doorArcStartX_ + doorRadiusMm_ * (cosf(theta) - cosf(doorTargetAngleRad_));
             if (armDelta != 0) doorArm_.move(armDelta, Config::DoorArm::ARC_STEP_DELAY_US);
             axisX_.moveTo(xTarget, Config::MotionX::DOOR_ARC_MAX_RPM);
             axisX_.update();
             doorArcStep_--;
             break;
         }
-        case 4: // Z absenken → Mechanismus aushaken
+        case 4: // Z absenken → Mechanismus aushaken (X holt letzten Waypoint ein)
+            axisX_.update();
             if (axisZ_.update()) {
                 doorArm_.move(-doorArm_.stepPosition());
                 doorPhase_ = 5;
