@@ -50,6 +50,7 @@ enum class CommandType : uint8_t {
     OpenDoor,
     CloseDoor,
     ResetError,
+    AssumePosition,
     Pickup,
     Deposit,
 };

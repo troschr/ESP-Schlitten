@@ -33,6 +33,7 @@ private:
     void handleMoveTo(const Command &cmd);
     void handleMoveHome(const Command &cmd);
     void handleResetError(const Command &cmd);
+    void handleAssumePosition(const Command &cmd);
     void handleOpenDoor(const Command &cmd);
     void handleCloseDoor(const Command &cmd);
     void handlePickup(const Command &cmd);
@@ -47,6 +48,10 @@ private:
     void updateDeposit();
     void updateOpenDoor();
     void updateCloseDoor();
+
+    // ── Positionsgrenzen ─────────────────────────────────────────────────────
+    static bool posInRange(float xMm, float zMm);
+    static bool zInRange(float zMm);
 
     // ── Zustandsmaschine ─────────────────────────────────────────────────────
     void setState(AppState next);

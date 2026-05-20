@@ -17,6 +17,15 @@ AppController::AppController()
                Config::DoorArm::STEP_US, Config::DoorArm::DIR_US, Config::DoorArm::STEP_DELAY_US)
 {}
 
+bool AppController::posInRange(float xMm, float zMm) {
+    return xMm >= 0.0f && xMm <= Config::MotionX::MAX_TRAVEL_MM
+        && zMm >= 0.0f && zMm <= Config::MotionZ::MAX_TRAVEL_MM;
+}
+
+bool AppController::zInRange(float zMm) {
+    return zMm >= 0.0f && zMm <= Config::MotionZ::MAX_TRAVEL_MM;
+}
+
 void AppController::begin() {
     Serial.begin(Config::Serial::BAUD_RATE);
 
@@ -101,6 +110,7 @@ void AppController::dispatchCommand(const Command &cmd) {
         case CommandType::MoveTo:        handleMoveTo(cmd);        return;
         case CommandType::MoveHome:      handleMoveHome(cmd);      return;
         case CommandType::ResetError:    handleResetError(cmd);    return;
+        case CommandType::AssumePosition: handleAssumePosition(cmd); return;
         case CommandType::OpenDoor:      handleOpenDoor(cmd);      return;
         case CommandType::CloseDoor:     handleCloseDoor(cmd);     return;
         case CommandType::Pickup:        handlePickup(cmd);        return;
@@ -197,6 +207,11 @@ void AppController::handleMoveTo(const Command &cmd) {
         return;
     }
 
+    if (!posInRange((float)cmd.target.x_mm, (float)cmd.target.z_mm)) {
+        comm_.sendResponseError(cmd.id, ErrorCode::PositionError);
+        return;
+    }
+
     target_           = cmd.target;
     pendingMoveCmdId_ = cmd.id;
     error_            = ErrorCode::None;
@@ -259,6 +274,19 @@ void AppController::handleResetError(const Command &cmd) {
     reporter_.sendOk(cmd.id, "ERROR_RESET", motionSnapshot());
 }
 
+void AppController::handleAssumePosition(const Command &cmd) {
+    if (state_ != AppState::NotReferenced) {
+        comm_.sendResponseError(cmd.id, ErrorCode::InvalidState);
+        return;
+    }
+    referenced_ = true;
+    target_     = current_;
+    error_      = ErrorCode::None;
+    comm_.sendAck(cmd.id);
+    setState(AppState::Ready);
+    reporter_.sendOk(cmd.id, "ASSUME_POSITION_DONE", motionSnapshot());
+}
+
 void AppController::handleOpenDoor(const Command &cmd) {
     if (state_ == AppState::Error) {
         comm_.sendResponseError(cmd.id, ErrorCode::InvalidState);
@@ -274,6 +302,17 @@ void AppController::handleOpenDoor(const Command &cmd) {
     if (!referenced_) {
         comm_.sendResponseError(cmd.id, ErrorCode::NotReferenced);
         return;
+    }
+
+    {
+        const float xApp  = (float)cmd.xApproachMm;
+        const float zApp  = (float)cmd.zApproachMm;
+        const float zHook = zApp + (float)cmd.hookDropMm;
+        const float xArcMin = xApp - (float)cmd.radiusMm;
+        if (!posInRange(xApp, zApp) || !zInRange(zHook) || xArcMin < 0.0f) {
+            comm_.sendResponseError(cmd.id, ErrorCode::PositionError);
+            return;
+        }
     }
 
     comm_.sendAck(cmd.id);
@@ -312,6 +351,17 @@ void AppController::handleCloseDoor(const Command &cmd) {
     if (!referenced_) {
         comm_.sendResponseError(cmd.id, ErrorCode::NotReferenced);
         return;
+    }
+
+    {
+        const float xApp  = (float)cmd.xApproachMm;
+        const float zApp  = (float)cmd.zApproachMm;
+        const float zHook = zApp + (float)cmd.hookDropMm;
+        const float xArcMin = xApp - (float)cmd.radiusMm;
+        if (!posInRange(xApp, zApp) || !zInRange(zHook) || xArcMin < 0.0f) {
+            comm_.sendResponseError(cmd.id, ErrorCode::PositionError);
+            return;
+        }
     }
 
     comm_.sendAck(cmd.id);
@@ -358,6 +408,14 @@ void AppController::handlePickup(const Command &cmd) {
         return;
     }
 
+    {
+        const float zLift = axisZ_.positionMm() + (float)cmd.liftOffsetMm;
+        if (!zInRange(zLift)) {
+            comm_.sendResponseError(cmd.id, ErrorCode::PositionError);
+            return;
+        }
+    }
+
     comm_.sendAck(cmd.id);
 
     gripperSteps_       = (int32_t)(cmd.gripperDepthMm * Config::Gripper::STEPS_PER_MM);
@@ -392,6 +450,14 @@ void AppController::handleDeposit(const Command &cmd) {
     if (!sensors_.readDoorMm(doorMm) || doorMm <= Config::Sensor::DOOR_ENTRY_CLEARANCE_MM) {
         comm_.sendResponseError(cmd.id, ErrorCode::DoorNotOpen);
         return;
+    }
+
+    {
+        const float zLift = axisZ_.positionMm() + (float)cmd.liftOffsetMm;
+        if (!zInRange(zLift)) {
+            comm_.sendResponseError(cmd.id, ErrorCode::PositionError);
+            return;
+        }
     }
 
     comm_.sendAck(cmd.id);

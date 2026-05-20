@@ -20,6 +20,7 @@ namespace MotionX {
     constexpr uint32_t STEP_US           = 3;        // STEP-Pulsbreite µs (CL42T min. 2,5 µs)
     constexpr uint32_t DIR_US            = 5;        // DIR-Setup vor erstem STEP µs
     constexpr bool     HOMING_FORWARD    = false;    // Richtung Referenzposition (false = rückwärts)
+    constexpr float    MAX_TRAVEL_MM     = 1000.0f;   // maximale X-Verfahrlänge
     constexpr uint16_t DOOR_ARC_MAX_RPM  = 10;       // Maximalgeschwindigkeit X-Achse während Türöffnen
     constexpr uint16_t DOOR_ARC_START_RPM = 3;       // Startgeschwindigkeit X-Achse während Türöffnen
 }
@@ -35,8 +36,8 @@ namespace MotionZ {
     constexpr uint32_t STEP_US        = 3;
     constexpr uint32_t DIR_US         = 5;
     constexpr bool     HOMING_FORWARD = false;
-    constexpr float    MAX_TRAVEL_MM   = 1300.0f;   // maximale Z-Verfahrlänge
-    constexpr float    SCAN_Z_PROBE_MM = 1200.0f;   // Z-Position der zweiten TF-Luna-Messung beim Scan
+    constexpr float    MAX_TRAVEL_MM   = 1400.0f;   // maximale Z-Verfahrlänge
+    constexpr float    SCAN_Z_PROBE_MM = 1350.0f;   // Z-Position der zweiten TF-Luna-Messung beim Scan
 }
 
 // ─── DRV8825 Greifer ──────────────────────────────────────────────────────────
