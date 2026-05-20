@@ -14,8 +14,8 @@ namespace MotionX {
     constexpr float    STEPS_PER_MM      = 50.0f;  // Schritte/mm (abhängig von Spindel + DIP-Schalter)
     constexpr uint32_t STEPS_PER_REV     = 800;      // Mikroschritte/Umdrehung (DIP am CL42T)
     constexpr uint16_t MAX_RPM           = 20;       // Maximalgeschwindigkeit (Normalbetrieb)
-    constexpr uint16_t START_RPM         = 5;        // Startgeschwindigkeit (Fuß der Rampe)
-    constexpr uint16_t HOMING_RPM        = 15;       // Geschwindigkeit während Referenzfahrt
+    constexpr uint16_t START_RPM         = 3;        // Startgeschwindigkeit (Fuß der Rampe)
+    constexpr uint16_t HOMING_RPM        = 3;       // Geschwindigkeit während Referenzfahrt
     constexpr uint32_t ACCEL_STEPS       = 3000;     // Rampenlänge in Schritten
     constexpr uint32_t STEP_US           = 3;        // STEP-Pulsbreite µs (CL42T min. 2,5 µs)
     constexpr uint32_t DIR_US            = 5;        // DIR-Setup vor erstem STEP µs
@@ -26,17 +26,17 @@ namespace MotionX {
 
 // ─── CL42T Z-Achse (Schlitten vertikal) ──────────────────────────────────────
 namespace MotionZ {
-    constexpr float    STEPS_PER_MM   = 50.0f;
+    constexpr float    STEPS_PER_MM   = 25.0f;
     constexpr uint32_t STEPS_PER_REV  = 800;
     constexpr uint16_t MAX_RPM        = 100;
-    constexpr uint16_t START_RPM      = 5;
-    constexpr uint16_t HOMING_RPM     = 30;
-    constexpr uint32_t ACCEL_STEPS    = 3000;
+    constexpr uint16_t START_RPM      = 15;
+    constexpr uint16_t HOMING_RPM     = 15;
+    constexpr uint32_t ACCEL_STEPS    = 5000;
     constexpr uint32_t STEP_US        = 3;
     constexpr uint32_t DIR_US         = 5;
     constexpr bool     HOMING_FORWARD = false;
-    constexpr float    MAX_TRAVEL_MM   = 240.0f;   // maximale Z-Verfahrlänge
-    constexpr float    SCAN_Z_PROBE_MM = 200.0f;   // Z-Position der zweiten TF-Luna-Messung beim Scan
+    constexpr float    MAX_TRAVEL_MM   = 130.0f;   // maximale Z-Verfahrlänge
+    constexpr float    SCAN_Z_PROBE_MM = 130.0f;   // Z-Position der zweiten TF-Luna-Messung beim Scan
 }
 
 // ─── DRV8825 Greifer ──────────────────────────────────────────────────────────

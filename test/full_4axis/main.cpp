@@ -28,16 +28,16 @@
 constexpr uint16_t CL_STEPS_PER_REV = 800;
 
 // ── Schritte pro Millimeter ─────────────────────────────────────────
-constexpr float STEPS_PER_MM_X = 800.0f;
-constexpr float STEPS_PER_MM_Y = 800.0f;
+constexpr float STEPS_PER_MM_X = 6.06f;
+constexpr float STEPS_PER_MM_Y = 16.0f;
 
 // ── Geschwindigkeit & Rampe – Achse X ──────────────────────────────
-constexpr uint16_t X_MAX_SPEED_RPM   = 100;
-constexpr uint16_t X_START_SPEED_RPM = 10;
+constexpr uint16_t X_MAX_SPEED_RPM   = 10;
+constexpr uint16_t X_START_SPEED_RPM = 2;
 constexpr uint32_t X_ACCEL_STEPS     = 2000;
 
 // ── Geschwindigkeit & Rampe – Achse Y ──────────────────────────────
-constexpr uint16_t Y_MAX_SPEED_RPM   = 100;
+constexpr uint16_t Y_MAX_SPEED_RPM   = 50;
 constexpr uint16_t Y_START_SPEED_RPM = 10;
 constexpr uint32_t Y_ACCEL_STEPS     = 2000;
 

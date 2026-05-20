@@ -3,11 +3,14 @@
 // Pinbelegung: siehe src/config/Pins.h
 //
 // Befehle (Seriell 115200):
-//   goto <x_mm> <z_mm>   CL42T X+Z verfahren
-//   home all              Alle 4 Motorachsen auf Nullpunkt
-//   home x|z|greifer|tuer Einzelne Achse homen
-//   greifer ein|aus|<mm>  Greifer ein-/ausfahren oder ±mm relativ
-//   tuer ein|aus|<mm>     Tür ein-/ausfahren oder ±mm relativ
+//   goto <x_mm> <z_mm>         CL42T X+Z verfahren (mm, absolut)
+//   goto steps <x_st> <z_st>  CL42T X+Z verfahren (Schritte, relativ; neg. = rückwärts)
+//   home all                   Alle 4 Motorachsen auf Nullpunkt
+//   home x|z|greifer|tuer      Einzelne Achse homen
+//   greifer <mm>               Greifer ±mm relativ (pos. = ausfahren)
+//   greifer steps <n>          Greifer ±n Schritte relativ
+//   tuer <mm>                  Tür ±mm relativ (pos. = ausfahren)
+//   tuer steps <n>             Tür ±n Schritte relativ
 //   tuer oeffnen          Greifer aus → Schlitten+Greifer ein+Tür auf
 //   all go                goto 500/500 + alle 4 Motoren gleichzeitig
 //   read                  Beide Sensoren einmal auslesen
@@ -26,18 +29,18 @@
 // ════════════════════════════════════════════════════════════════════
 
 // Config::MotionX
-constexpr float    X_STEPS_PER_MM  = 50.0f;   // → Config::MotionX::STEPS_PER_MM
+constexpr float    X_STEPS_PER_MM  = 5.75f;   // → Config::MotionX::STEPS_PER_MM
 constexpr uint32_t X_STEPS_PER_REV = 800;      // → Config::MotionX::STEPS_PER_REV
-constexpr uint16_t X_MAX_RPM       = 20;        // → Config::MotionX::MAX_RPM
-constexpr uint16_t X_START_RPM     = 5;         // → Config::MotionX::START_RPM
-constexpr uint32_t X_ACCEL_STEPS   = 3000;      // → Config::MotionX::ACCEL_STEPS
+constexpr uint16_t X_MAX_RPM       = 22;        // → Config::MotionX::MAX_RPM
+constexpr uint16_t X_START_RPM     = 2;         // → Config::MotionX::START_RPM
+constexpr uint32_t X_ACCEL_STEPS   = 2000;      // → Config::MotionX::ACCEL_STEPS
 
 // Config::MotionZ
-constexpr float    Z_STEPS_PER_MM  = 50.0f;    // → Config::MotionZ::STEPS_PER_MM
+constexpr float    Z_STEPS_PER_MM  = 25.0f;    // → Config::MotionZ::STEPS_PER_MM
 constexpr uint32_t Z_STEPS_PER_REV = 800;       // → Config::MotionZ::STEPS_PER_REV
-constexpr uint16_t Z_MAX_RPM       = 100;        // → Config::MotionZ::MAX_RPM
-constexpr uint16_t Z_START_RPM     = 5;          // → Config::MotionZ::START_RPM
-constexpr uint32_t Z_ACCEL_STEPS   = 3000;       // → Config::MotionZ::ACCEL_STEPS
+constexpr uint16_t Z_MAX_RPM       = 120;        // → Config::MotionZ::MAX_RPM
+constexpr uint16_t Z_START_RPM     = 15;          // → Config::MotionZ::START_RPM
+constexpr uint32_t Z_ACCEL_STEPS   = 5000;       // → Config::MotionZ::ACCEL_STEPS
 
 // CL42T Timing (Chip-Spec, normalerweise nicht kalibrieren)
 constexpr uint32_t CL_T_STEP_US    = 3;
@@ -77,7 +80,7 @@ constexpr uint32_t rpmToHalfUs(uint16_t rpm, uint32_t stepsPerRev) {
 }
 
 struct ClMotor {
-    uint8_t  pinStep, pinDir, pinEn, pinAlm;
+    uint8_t  pinStep, pinDir, pinEn;
     uint32_t totalSteps, stepsDone;
     bool     forward, enabled;
     float    positionMm;
@@ -86,33 +89,25 @@ struct ClMotor {
     uint16_t maxRpm, startRpm;
 };
 
-ClMotor axisX = { Pins::X_STEP, Pins::X_DIR, Pins::X_EN, Pins::X_ALM, 0, 0, true, false, 0.0f,
+ClMotor axisX = { Pins::X_STEP, Pins::X_DIR, Pins::X_EN, 0, 0, true, false, 0.0f,
                   X_STEPS_PER_MM,
                   rpmToHalfUs(X_MAX_RPM, X_STEPS_PER_REV), rpmToHalfUs(X_START_RPM, X_STEPS_PER_REV),
                   X_ACCEL_STEPS, X_MAX_RPM, X_START_RPM };
 
-ClMotor axisZ = { Pins::Z_STEP, Pins::Z_DIR, Pins::Z_EN, Pins::Z_ALM, 0, 0, true, false, 0.0f,
+ClMotor axisZ = { Pins::Z_STEP, Pins::Z_DIR, Pins::Z_EN, 0, 0, true, false, 0.0f,
                   Z_STEPS_PER_MM,
                   rpmToHalfUs(Z_MAX_RPM, Z_STEPS_PER_REV), rpmToHalfUs(Z_START_RPM, Z_STEPS_PER_REV),
                   Z_ACCEL_STEPS, Z_MAX_RPM, Z_START_RPM };
 
 void initClMotor(const ClMotor& m) {
     pinMode(m.pinStep, OUTPUT); pinMode(m.pinDir, OUTPUT);
-    pinMode(m.pinEn,   OUTPUT); pinMode(m.pinAlm, INPUT_PULLUP);
+    pinMode(m.pinEn,   OUTPUT);
     digitalWrite(m.pinStep, LOW); digitalWrite(m.pinDir, LOW); digitalWrite(m.pinEn, HIGH);
 }
 
 void enableClMotor(ClMotor& m, bool on) {
     m.enabled = on;
     digitalWrite(m.pinEn, on ? LOW : HIGH);
-}
-
-bool checkAlarm(const ClMotor& m, char axis) {
-    if (digitalRead(m.pinAlm) == LOW) {
-        Serial.printf("!! ALARM Achse %c: CL42T meldet Fehler !!\n", axis);
-        return true;
-    }
-    return false;
 }
 
 uint32_t trapezDelay(const ClMotor& m) {
@@ -137,12 +132,10 @@ void runBothAxes(ClMotor& mx, ClMotor& mz) {
     while ((moveX && mx.stepsDone < mx.totalSteps) || (moveZ && mz.stepsDone < mz.totalSteps)) {
         now = micros();
         if (moveX && mx.stepsDone < mx.totalSteps && (int32_t)(now - nxtX) >= 0) {
-            if (checkAlarm(mx, 'X')) { mx.stepsDone = mx.totalSteps; }
-            else { uint32_t d = trapezDelay(mx); digitalWrite(mx.pinStep, HIGH); delayMicroseconds(CL_T_STEP_US); digitalWrite(mx.pinStep, LOW); mx.stepsDone++; nxtX += 2*d; }
+            { uint32_t d = trapezDelay(mx); digitalWrite(mx.pinStep, HIGH); delayMicroseconds(CL_T_STEP_US); digitalWrite(mx.pinStep, LOW); mx.stepsDone++; nxtX += 2*d; }
         }
         if (moveZ && mz.stepsDone < mz.totalSteps && (int32_t)(now - nxtZ) >= 0) {
-            if (checkAlarm(mz, 'Z')) { mz.stepsDone = mz.totalSteps; }
-            else { uint32_t d = trapezDelay(mz); digitalWrite(mz.pinStep, HIGH); delayMicroseconds(CL_T_STEP_US); digitalWrite(mz.pinStep, LOW); mz.stepsDone++; nxtZ += 2*d; }
+            { uint32_t d = trapezDelay(mz); digitalWrite(mz.pinStep, HIGH); delayMicroseconds(CL_T_STEP_US); digitalWrite(mz.pinStep, LOW); mz.stepsDone++; nxtZ += 2*d; }
         }
     }
     Serial.println("Zielposition erreicht.");
@@ -226,12 +219,10 @@ void runAxesAndAktor(ClMotor& mx, ClMotor& mz,
            (moveA1 && a1Done < a1.travelSteps)      || (moveA2 && a2Done < a2->travelSteps)) {
         now = micros();
         if (moveX && mx.stepsDone < mx.totalSteps && (int32_t)(now - nxtX) >= 0) {
-            if (checkAlarm(mx, 'X')) { mx.stepsDone = mx.totalSteps; }
-            else { uint32_t d = trapezDelay(mx); digitalWrite(mx.pinStep, HIGH); delayMicroseconds(CL_T_STEP_US); digitalWrite(mx.pinStep, LOW); mx.stepsDone++; nxtX += 2*d; }
+            { uint32_t d = trapezDelay(mx); digitalWrite(mx.pinStep, HIGH); delayMicroseconds(CL_T_STEP_US); digitalWrite(mx.pinStep, LOW); mx.stepsDone++; nxtX += 2*d; }
         }
         if (moveZ && mz.stepsDone < mz.totalSteps && (int32_t)(now - nxtZ) >= 0) {
-            if (checkAlarm(mz, 'Z')) { mz.stepsDone = mz.totalSteps; }
-            else { uint32_t d = trapezDelay(mz); digitalWrite(mz.pinStep, HIGH); delayMicroseconds(CL_T_STEP_US); digitalWrite(mz.pinStep, LOW); mz.stepsDone++; nxtZ += 2*d; }
+            { uint32_t d = trapezDelay(mz); digitalWrite(mz.pinStep, HIGH); delayMicroseconds(CL_T_STEP_US); digitalWrite(mz.pinStep, LOW); mz.stepsDone++; nxtZ += 2*d; }
         }
         if (moveA1 && a1Done < a1.travelSteps && (int32_t)(now - nxtA1) >= 0) {
             digitalWrite(a1.pinStep, HIGH); delayMicroseconds(a1.stepUs); digitalWrite(a1.pinStep, LOW);
@@ -248,13 +239,18 @@ void runAxesAndAktor(ClMotor& mx, ClMotor& mz,
 }
 
 void handleAktor(Aktor& a, const String& arg) {
-    if      (arg == "aus") moveAktor(a, true);
-    else if (arg == "ein") moveAktor(a, false);
-    else if (arg == "home") { a.positionMm = 0.0f; Serial.printf("%s: Nullpunkt gesetzt.\n", a.name); }
+    if (arg == "home") { a.positionMm = 0.0f; Serial.printf("%s: Nullpunkt gesetzt.\n", a.name); }
+    else if (arg.startsWith("steps ")) {
+        int32_t n = arg.substring(6).toInt();
+        bool ausfahren = n >= 0;
+        Serial.printf("%s: %ld Schritte (%s)\n", a.name, n, ausfahren ? ">>" : "<<");
+        moveAktorSteps(a, (uint32_t)abs(n), ausfahren);
+        Serial.printf("%s: Pos %.2f mm\n", a.name, a.positionMm);
+    }
     else {
         float mm = arg.toFloat();
         if (mm != 0.0f || arg == "0" || arg == "0.0") moveAktorMm(a, mm);
-        else Serial.printf("ERR: %s ein|aus|home|<mm>\n", a.name);
+        else Serial.printf("ERR: %s home|<mm>|steps <n>\n", a.name);
     }
 }
 
@@ -396,13 +392,30 @@ void handleGoto(const String& args) {
     axisX.positionMm = xMm; axisZ.positionMm = zMm;
 }
 
+void handleGotoSteps(const String& args) {
+    int sp = args.indexOf(' ');
+    if (sp < 0) { Serial.println("ERR: goto steps <x_steps> <z_steps>"); return; }
+    int32_t xSt = args.substring(0, sp).toInt();
+    int32_t zSt = args.substring(sp + 1).toInt();
+    axisX.totalSteps = (uint32_t)abs(xSt); axisX.forward = xSt >= 0;
+    axisZ.totalSteps = (uint32_t)abs(zSt); axisZ.forward = zSt >= 0;
+    Serial.printf("X: %ld Schritte (%s)\n", xSt, axisX.forward ? ">>" : "<<");
+    Serial.printf("Z: %ld Schritte (%s)\n", zSt, axisZ.forward ? ">>" : "<<");
+    runBothAxes(axisX, axisZ);
+    axisX.positionMm += (float)xSt / axisX.stepsMm;
+    axisZ.positionMm += (float)zSt / axisZ.stepsMm;
+}
+
 void printStatus() {
     Serial.println("────────────────────────────────────────────────────");
-    Serial.println("  goto <x_mm> <z_mm>   CL42T X+Z verfahren");
-    Serial.println("  home all              Alle 4 Motorachsen homen");
-    Serial.println("  home x|z|greifer|tuer Einzelne Achse homen");
-    Serial.println("  greifer ein|aus|<mm>  Greifer ein-/ausfahren oder ±mm relativ");
-    Serial.println("  tuer ein|aus|<mm>     Tür ein-/ausfahren oder ±mm relativ");
+    Serial.println("  goto <x_mm> <z_mm>          X+Z verfahren (mm, absolut)");
+    Serial.println("  goto steps <x_st> <z_st>   X+Z verfahren (Schritte, relativ)");
+    Serial.println("  home all                    Alle 4 Achsen Nullpunkt setzen");
+    Serial.println("  home x|z|greifer|tuer       Einzelne Achse Nullpunkt setzen");
+    Serial.println("  greifer <mm>                Greifer ±mm relativ (pos. = ausfahren)");
+    Serial.println("  greifer steps <n>           Greifer ±n Schritte relativ");
+    Serial.println("  tuer <mm>                   Tür ±mm relativ (pos. = ausfahren)");
+    Serial.println("  tuer steps <n>              Tür ±n Schritte relativ");
     Serial.println("  tuer oeffnen          Greifer aus → Schlitten+Greifer ein+Tür auf");
     Serial.println("  all go                goto 500/500 + alle 4 Motoren gleichzeitig");
     Serial.println("  read                  Beide Sensoren auslesen");
@@ -419,9 +432,7 @@ void printStatus() {
         greifer.positionMm, greifer.travelSteps, greifer.stepsMm, greifer.stepDelayUs);
     Serial.printf("  Tuer:    %.2f mm  TravelSteps %lu  %.1f Steps/mm  Delay %lu us\n",
         tuer.positionMm, tuer.travelSteps, tuer.stepsMm, tuer.stepDelayUs);
-    Serial.printf("  ALM X: %s  |  ALM Z: %s\n",
-        digitalRead(Pins::X_ALM) == LOW ? "FEHLER" : "OK",
-        digitalRead(Pins::Z_ALM) == LOW ? "FEHLER" : "OK");
+
     Serial.printf("  SW Greifer-Home: %s  |  SW Tuer-Home: %s\n",
         digitalRead(Pins::GRIPPER_HOME_SW)  == LOW ? "AKTIV" : "offen",
         digitalRead(Pins::DOOR_ARM_HOME_SW) == LOW ? "AKTIV" : "offen");
@@ -438,7 +449,13 @@ void handleCommand(const String& raw) {
     cmd.trim();
     if (cmd.length() == 0) return;
 
-    if      (cmd.startsWith("goto "))    handleGoto(cmd.substring(5));
+    bool isMotorCmd = cmd.startsWith("goto") || cmd.startsWith("greifer ") ||
+                      cmd.startsWith("tuer ") || cmd == "tuer oeffnen" || cmd == "all go";
+    bool streamWas = streaming;
+    if (isMotorCmd) streaming = false;
+
+    if      (cmd.startsWith("goto steps ")) handleGotoSteps(cmd.substring(11));
+    else if (cmd.startsWith("goto "))    handleGoto(cmd.substring(5));
     else if (cmd.startsWith("home")) {
         String arg = cmd.substring(4); arg.trim();
         if      (arg == "all" || arg == "") {
@@ -456,6 +473,8 @@ void handleCommand(const String& raw) {
     else if (cmd == "all go")            handleAllGo();
     else if (cmd == "tuer oeffnen")      handleTuerOeffnen();
     else if (cmd.startsWith("tuer "))    handleAktor(tuer, cmd.substring(5));
+
+    if (isMotorCmd) streaming = streamWas;
     else if (cmd == "read")              printReading();
     else if (cmd == "stream on")         { streaming = true;  Serial.println("Streaming EIN."); }
     else if (cmd == "stream off")        { streaming = false; Serial.println("Streaming AUS."); }
