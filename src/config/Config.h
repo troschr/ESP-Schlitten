@@ -11,12 +11,12 @@ namespace Serial {
 
 // ─── CL42T X-Achse (Schlitten horizontal) ────────────────────────────────────
 namespace MotionX {
-    constexpr float    STEPS_PER_MM      = 50.0f;  // Schritte/mm (abhängig von Spindel + DIP-Schalter)
+    constexpr float    STEPS_PER_MM      = 5.75f;  // Schritte/mm (abhängig von Spindel + DIP-Schalter)
     constexpr uint32_t STEPS_PER_REV     = 800;      // Mikroschritte/Umdrehung (DIP am CL42T)
-    constexpr uint16_t MAX_RPM           = 20;       // Maximalgeschwindigkeit (Normalbetrieb)
-    constexpr uint16_t START_RPM         = 3;        // Startgeschwindigkeit (Fuß der Rampe)
+    constexpr uint16_t MAX_RPM           = 22;       // Maximalgeschwindigkeit (Normalbetrieb)
+    constexpr uint16_t START_RPM         = 2;        // Startgeschwindigkeit (Fuß der Rampe)
     constexpr uint16_t HOMING_RPM        = 3;       // Geschwindigkeit während Referenzfahrt
-    constexpr uint32_t ACCEL_STEPS       = 3000;     // Rampenlänge in Schritten
+    constexpr uint32_t ACCEL_STEPS       = 2500;     // Rampenlänge in Schritten
     constexpr uint32_t STEP_US           = 3;        // STEP-Pulsbreite µs (CL42T min. 2,5 µs)
     constexpr uint32_t DIR_US            = 5;        // DIR-Setup vor erstem STEP µs
     constexpr bool     HOMING_FORWARD    = false;    // Richtung Referenzposition (false = rückwärts)
@@ -35,8 +35,8 @@ namespace MotionZ {
     constexpr uint32_t STEP_US        = 3;
     constexpr uint32_t DIR_US         = 5;
     constexpr bool     HOMING_FORWARD = false;
-    constexpr float    MAX_TRAVEL_MM   = 130.0f;   // maximale Z-Verfahrlänge
-    constexpr float    SCAN_Z_PROBE_MM = 130.0f;   // Z-Position der zweiten TF-Luna-Messung beim Scan
+    constexpr float    MAX_TRAVEL_MM   = 1300.0f;   // maximale Z-Verfahrlänge
+    constexpr float    SCAN_Z_PROBE_MM = 1200.0f;   // Z-Position der zweiten TF-Luna-Messung beim Scan
 }
 
 // ─── DRV8825 Greifer ──────────────────────────────────────────────────────────
@@ -67,8 +67,7 @@ namespace DoorArm {
 namespace Timing {
     constexpr uint32_t HEARTBEAT_MS    = 1000;
     constexpr uint32_t STREAM_MS       = 100;
-    constexpr uint32_t MOVE_TIMEOUT_MS = 100000;
-    constexpr uint32_t HOME_TIMEOUT_MS = 35000;
+
     constexpr uint32_t SENSOR_POLL_MS  = 50;      // Hindernissensor-Abfrageintervall während Fahrt
 }
 

@@ -4,11 +4,11 @@
 
 namespace esp_schlitten {
 
-ClMotor::ClMotor(uint8_t pinStep, uint8_t pinDir, uint8_t pinEn, uint8_t pinAlm,
+ClMotor::ClMotor(uint8_t pinStep, uint8_t pinDir, uint8_t pinEn,
                  float stepsPerMm, uint32_t stepsPerRev,
                  uint16_t maxRpm, uint16_t startRpm, uint32_t accelSteps,
                  uint32_t stepPulseUs, uint32_t dirSetupUs)
-    : _pinStep(pinStep), _pinDir(pinDir), _pinEn(pinEn), _pinAlm(pinAlm)
+    : _pinStep(pinStep), _pinDir(pinDir), _pinEn(pinEn)
     , _stepsPerMm(stepsPerMm), _stepsPerRev(stepsPerRev)
     , _stepPulseUs(stepPulseUs), _dirSetupUs(dirSetupUs)
     , _dfltAccelSteps(accelSteps)
@@ -31,7 +31,6 @@ void ClMotor::begin() {
     pinMode(_pinStep, OUTPUT);
     pinMode(_pinDir,  OUTPUT);
     pinMode(_pinEn,   OUTPUT);
-    pinMode(_pinAlm,  INPUT_PULLUP);
     digitalWrite(_pinStep, LOW);
     digitalWrite(_pinDir,  LOW);
     digitalWrite(_pinEn,   HIGH);  // active-low: HIGH = deaktiviert
@@ -94,12 +93,6 @@ bool ClMotor::update() {
     const uint32_t now = micros();
     if ((int32_t)(now - _nextStepUs) < 0) return false;
 
-    // ALM-Check: Alarm → sofort stoppen, Caller prüft alarmActive()
-    if (alarmActive()) {
-        stop();
-        return true;
-    }
-
     const uint32_t d = trapezDelay();
     digitalWrite(_pinStep, HIGH);
     delayMicroseconds(_stepPulseUs);
@@ -127,10 +120,6 @@ void ClMotor::setPositionMm(float mm) {
 
 float ClMotor::positionMm() const {
     return _positionSteps / _stepsPerMm;
-}
-
-bool ClMotor::alarmActive() const {
-    return digitalRead(_pinAlm) == LOW;
 }
 
 uint32_t ClMotor::trapezDelay() const {

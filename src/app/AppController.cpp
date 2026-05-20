@@ -3,11 +3,11 @@
 namespace esp_schlitten {
 
 AppController::AppController()
-    : axisX_(Pins::X_STEP, Pins::X_DIR, Pins::X_EN, Pins::X_ALM,
+    : axisX_(Pins::X_STEP, Pins::X_DIR, Pins::X_EN,
              Config::MotionX::STEPS_PER_MM, Config::MotionX::STEPS_PER_REV,
              Config::MotionX::MAX_RPM, Config::MotionX::START_RPM, Config::MotionX::ACCEL_STEPS,
              Config::MotionX::STEP_US, Config::MotionX::DIR_US)
-    , axisZ_(Pins::Z_STEP, Pins::Z_DIR, Pins::Z_EN, Pins::Z_ALM,
+    , axisZ_(Pins::Z_STEP, Pins::Z_DIR, Pins::Z_EN,
              Config::MotionZ::STEPS_PER_MM, Config::MotionZ::STEPS_PER_REV,
              Config::MotionZ::MAX_RPM, Config::MotionZ::START_RPM, Config::MotionZ::ACCEL_STEPS,
              Config::MotionZ::STEP_US, Config::MotionZ::DIR_US)
@@ -434,17 +434,7 @@ void AppController::updateHoming() {
         doorArmHomed_ = true;
     }
 
-    checkDriverAlarms();
     if (state_ != AppState::BusyHoming) return;
-
-    if ((millis() - homingStartMs_) > Config::Timing::HOME_TIMEOUT_MS) {
-        axisX_.stop();
-        axisZ_.stop();
-        gripper_.stop();
-        doorArm_.stop();
-        enterError(ErrorCode::HomingTimeout);
-        return;
-    }
 
     if (xHomed_ && zHomed_ && gripperHomed_ && doorArmHomed_) {
         axisZ_.stop();
@@ -459,14 +449,7 @@ void AppController::updateHoming() {
 void AppController::updateScanning() {
     const bool zDone = axisZ_.update();
 
-    checkDriverAlarms();
     if (state_ != AppState::BusyScanning) return;
-
-    if ((millis() - scanStartMs_) > Config::Timing::MOVE_TIMEOUT_MS) {
-        axisZ_.stop();
-        enterError(ErrorCode::MoveTimeout);
-        return;
-    }
 
     if (scanPhase_ == 0) {
         // Messung in Home-Position
@@ -514,15 +497,7 @@ void AppController::updateMoveHome() {
         axisZ_.update();
     }
 
-    checkDriverAlarms();
     if (state_ != AppState::BusyMoveHome) return;
-
-    if ((millis() - moveHomeStartMs_) > Config::Timing::HOME_TIMEOUT_MS) {
-        axisX_.stop();
-        axisZ_.stop();
-        enterError(ErrorCode::HomingTimeout);
-        return;
-    }
 
     if (xHomed_ && zHomed_) {
         axisZ_.stop();
@@ -537,16 +512,7 @@ void AppController::updateMoving() {
     const bool xDone = axisX_.update();
     const bool zDone = axisZ_.update();
 
-    checkDriverAlarms();
     if (state_ != AppState::BusyMoving) return;
-
-    const uint32_t now = millis();
-    if ((now - moveStartMs_) > Config::Timing::MOVE_TIMEOUT_MS) {
-        axisX_.stop();
-        axisZ_.stop();
-        enterError(ErrorCode::MoveTimeout);
-        return;
-    }
 
     if (xDone && zDone) {
         current_.x_mm = (int32_t)axisX_.positionMm();
@@ -557,13 +523,6 @@ void AppController::updateMoving() {
 }
 
 void AppController::updatePickup() {
-    if ((millis() - actionStartMs_) > Config::Timing::MOVE_TIMEOUT_MS) {
-        gripper_.stop();
-        axisZ_.stop();
-        enterError(ErrorCode::MoveTimeout);
-        return;
-    }
-
     switch (actionPhase_) {
         case 0: // Greifer fährt aus – gripper_.update() läuft im Haupt-Loop
             if (!gripper_.isMoving()) {
@@ -596,13 +555,6 @@ void AppController::updatePickup() {
 }
 
 void AppController::updateDeposit() {
-    if ((millis() - actionStartMs_) > Config::Timing::MOVE_TIMEOUT_MS) {
-        gripper_.stop();
-        axisZ_.stop();
-        enterError(ErrorCode::MoveTimeout);
-        return;
-    }
-
     switch (actionPhase_) {
         case 0: // Z hebt an (gestartet in handleDeposit)
             if (axisZ_.update()) {
@@ -635,15 +587,6 @@ void AppController::updateDeposit() {
 }
 
 void AppController::updateOpenDoor() {
-    if ((millis() - doorStartMs_) > Config::Timing::MOVE_TIMEOUT_MS) {
-        doorArm_.stop();
-        axisX_.stop();
-        axisZ_.stop();
-        enterError(ErrorCode::MoveTimeout);
-        return;
-    }
-
-    checkDriverAlarms();
     if (state_ != AppState::BusyOpenDoor) return;
 
     switch (doorPhase_) {
@@ -719,15 +662,6 @@ void AppController::updateOpenDoor() {
 }
 
 void AppController::updateCloseDoor() {
-    if ((millis() - doorStartMs_) > Config::Timing::MOVE_TIMEOUT_MS) {
-        doorArm_.stop();
-        axisX_.stop();
-        axisZ_.stop();
-        enterError(ErrorCode::MoveTimeout);
-        return;
-    }
-
-    checkDriverAlarms();
     if (state_ != AppState::BusyCloseDoor) return;
 
     switch (doorPhase_) {
@@ -806,13 +740,6 @@ void AppController::updateCloseDoor() {
     }
 }
 
-void AppController::checkDriverAlarms() {
-    if (axisX_.alarmActive() || axisZ_.alarmActive()) {
-        axisX_.stop();
-        axisZ_.stop();
-        enterError(ErrorCode::DriverFault);
-    }
-}
 
 // ─── Zustandsmaschine ─────────────────────────────────────────────────────────
 

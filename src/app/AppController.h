@@ -47,7 +47,6 @@ private:
     void updateDeposit();
     void updateOpenDoor();
     void updateCloseDoor();
-    void checkDriverAlarms();
 
     // ── Zustandsmaschine ─────────────────────────────────────────────────────
     void setState(AppState next);

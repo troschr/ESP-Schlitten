@@ -9,7 +9,7 @@ namespace esp_schlitten {
 
 class ClMotor {
 public:
-    ClMotor(uint8_t pinStep, uint8_t pinDir, uint8_t pinEn, uint8_t pinAlm,
+    ClMotor(uint8_t pinStep, uint8_t pinDir, uint8_t pinEn,
             float stepsPerMm, uint32_t stepsPerRev,
             uint16_t maxRpm, uint16_t startRpm, uint32_t accelSteps,
             uint32_t stepPulseUs, uint32_t dirSetupUs);
@@ -34,14 +34,13 @@ public:
 
     float positionMm()  const;
     bool  isMoving()    const { return _moving; }
-    bool  alarmActive() const;       // CL42T ALM-Pin: LOW = Treiberfehler
 
 private:
     uint32_t trapezDelay() const;
     uint32_t rpmToHalfUs(uint16_t rpm) const;
 
     // Konfiguration (unveränderlich)
-    uint8_t  _pinStep, _pinDir, _pinEn, _pinAlm;
+    uint8_t  _pinStep, _pinDir, _pinEn;
     float    _stepsPerMm;
     uint32_t _stepsPerRev;
     uint32_t _stepPulseUs, _dirSetupUs;
