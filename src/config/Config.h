@@ -15,7 +15,7 @@ namespace MotionX {
     constexpr uint32_t STEPS_PER_REV     = 800;      // Mikroschritte/Umdrehung (DIP am CL42T)
     constexpr uint16_t MAX_RPM           = 22;       // Maximalgeschwindigkeit (Normalbetrieb)
     constexpr uint16_t START_RPM         = 2;        // Startgeschwindigkeit (Fuß der Rampe)
-    constexpr uint16_t HOMING_RPM        = 3;       // Geschwindigkeit während Referenzfahrt
+    constexpr uint16_t HOMING_RPM        = 4;       // Geschwindigkeit während Referenzfahrt
     constexpr uint32_t ACCEL_STEPS       = 2500;     // Rampenlänge in Schritten
     constexpr uint32_t STEP_US           = 3;        // STEP-Pulsbreite µs (CL42T min. 2,5 µs)
     constexpr uint32_t DIR_US            = 5;        // DIR-Setup vor erstem STEP µs
@@ -31,7 +31,7 @@ namespace MotionZ {
     constexpr uint32_t STEPS_PER_REV  = 800;
     constexpr uint16_t MAX_RPM        = 100;
     constexpr uint16_t START_RPM      = 15;
-    constexpr uint16_t HOMING_RPM     = 15;
+    constexpr uint16_t HOMING_RPM     = 25;
     constexpr uint32_t ACCEL_STEPS    = 5000;
     constexpr uint32_t STEP_US        = 3;
     constexpr uint32_t DIR_US         = 5;
