@@ -21,7 +21,7 @@ namespace MotionX {
     constexpr uint32_t DIR_US            = 5;        // DIR-Setup vor erstem STEP µs
     constexpr bool     HOMING_FORWARD    = false;    // Richtung Referenzposition (false = rückwärts)
     constexpr float    MAX_TRAVEL_MM     = 5000.0f;   // maximale X-Verfahrlänge
-    constexpr uint16_t DOOR_ARC_MAX_RPM  = 10;       // Maximalgeschwindigkeit X-Achse während Türöffnen
+    constexpr uint16_t DOOR_ARC_MAX_RPM  = 25;       // Maximalgeschwindigkeit X-Achse während Türöffnen
     constexpr uint16_t DOOR_ARC_START_RPM = 3;       // Startgeschwindigkeit X-Achse während Türöffnen
 }
 
@@ -45,7 +45,7 @@ namespace Gripper {
     constexpr uint32_t STEPS_PER_REV    = 200;     // Vollschritte/Umdrehung (DRV8825 ohne Mikroschritt)
     constexpr uint32_t TRAVEL_STEPS     = 800;      // Schritte für vollständige Ein-/Ausfahrt
     constexpr float    STEPS_PER_MM     = 20.0f;     // TODO: nach Kalibrierung anpassen
-    constexpr uint32_t STEP_DELAY_US    = 1800;     // Zeit zwischen zwei Schritten µs (Normalbetrieb)
+    constexpr uint32_t STEP_DELAY_US    = 1500;     // Zeit zwischen zwei Schritten µs (Normalbetrieb)
     constexpr uint32_t HOMING_STEP_DELAY_US = 1500; // Zeit zwischen zwei Schritten µs (Referenzfahrt)
     constexpr uint32_t STEP_US          = 4;        // STEP-Pulsbreite µs
     constexpr uint32_t DIR_US           = 1;        // DIR-Setup µs

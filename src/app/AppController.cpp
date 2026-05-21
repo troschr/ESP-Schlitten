@@ -678,9 +678,10 @@ void AppController::updateOpenDoor() {
                 doorPhase_   = 3;
             }
             break;
-        case 3: { // Kreisbogen öffnen: Arm treibt Timing, X folgt ohne Stopp
-            axisX_.update();
-            if (doorArm_.isMoving()) break;
+        case 3: { // Kreisbogen öffnen: Arm und X müssen beide fertig sein vor dem nächsten Waypoint
+            const bool xDone  = axisX_.update();
+            const bool armDone = !doorArm_.isMoving();
+            if (!xDone || !armDone) break;
             if (doorArcStep_ > doorArcTotalSteps_) {
                 axisZ_.moveTo(doorZApproachMm_);
                 doorPhase_ = 4;
@@ -692,13 +693,11 @@ void AppController::updateOpenDoor() {
             const float   xTarget  = doorArcStartX_ + doorRadiusMm_ * (cosf(theta) - 1.0f);
             if (armDelta != 0) doorArm_.move(armDelta, Config::DoorArm::ARC_STEP_DELAY_US);
             axisX_.moveTo(xTarget, Config::MotionX::DOOR_ARC_MAX_RPM);
-            axisX_.update();
             doorArcStep_++;
             break;
         }
-        case 4: // Z absenken → Mechanismus aushaken (X holt letzten Waypoint ein)
-            axisX_.update();
-            if (axisZ_.update()) {
+        case 4: // Z absenken → Mechanismus aushaken (wartet auf X und Z)
+            if (axisZ_.update() && axisX_.update()) {
                 doorArm_.move(-doorArm_.stepPosition());
                 doorPhase_ = 5;
             }
@@ -754,9 +753,10 @@ void AppController::updateCloseDoor() {
                 doorPhase_   = 3;
             }
             break;
-        case 3: { // Kreisbogen schließen: Arm treibt Timing, X folgt ohne Stopp
-            axisX_.update();
-            if (doorArm_.isMoving()) break;
+        case 3: { // Kreisbogen schließen: Arm und X müssen beide fertig sein vor dem nächsten Waypoint
+            const bool xDone   = axisX_.update();
+            const bool armDone = !doorArm_.isMoving();
+            if (!xDone || !armDone) break;
             if (doorArcStep_ < 0) {
                 axisZ_.moveTo(doorZApproachMm_);
                 doorPhase_ = 4;
@@ -768,13 +768,11 @@ void AppController::updateCloseDoor() {
             const float   xTarget  = doorArcStartX_ + doorRadiusMm_ * (cosf(theta) - cosf(doorTargetAngleRad_));
             if (armDelta != 0) doorArm_.move(armDelta, Config::DoorArm::ARC_STEP_DELAY_US);
             axisX_.moveTo(xTarget, Config::MotionX::DOOR_ARC_MAX_RPM);
-            axisX_.update();
             doorArcStep_--;
             break;
         }
-        case 4: // Z absenken → Mechanismus aushaken (X holt letzten Waypoint ein)
-            axisX_.update();
-            if (axisZ_.update()) {
+        case 4: // Z absenken → Mechanismus aushaken (wartet auf X und Z)
+            if (axisZ_.update() && axisX_.update()) {
                 doorArm_.move(-doorArm_.stepPosition());
                 doorPhase_ = 5;
             }
