@@ -14,13 +14,13 @@ namespace MotionX {
     constexpr float    STEPS_PER_MM      = 5.75f;  // Schritte/mm (abhängig von Spindel + DIP-Schalter)
     constexpr uint32_t STEPS_PER_REV     = 800;      // Mikroschritte/Umdrehung (DIP am CL42T)
     constexpr uint16_t MAX_RPM           = 22;       // Maximalgeschwindigkeit (Normalbetrieb)
-    constexpr uint16_t START_RPM         = 2;        // Startgeschwindigkeit (Fuß der Rampe)
-    constexpr uint16_t HOMING_RPM        = 4;       // Geschwindigkeit während Referenzfahrt
+    constexpr uint16_t START_RPM         = 8;        // Startgeschwindigkeit (Fuß der Rampe) – < 5 RPM = einzelne Klicks hörbar
+    constexpr uint16_t HOMING_RPM        = 6;        // Geschwindigkeit während Referenzfahrt
     constexpr uint32_t ACCEL_STEPS       = 2500;     // Rampenlänge in Schritten
     constexpr uint32_t STEP_US           = 3;        // STEP-Pulsbreite µs (CL42T min. 2,5 µs)
     constexpr uint32_t DIR_US            = 5;        // DIR-Setup vor erstem STEP µs
     constexpr bool     HOMING_FORWARD    = false;    // Richtung Referenzposition (false = rückwärts)
-    constexpr float    MAX_TRAVEL_MM     = 1000.0f;   // maximale X-Verfahrlänge
+    constexpr float    MAX_TRAVEL_MM     = 5000.0f;   // maximale X-Verfahrlänge
     constexpr uint16_t DOOR_ARC_MAX_RPM  = 10;       // Maximalgeschwindigkeit X-Achse während Türöffnen
     constexpr uint16_t DOOR_ARC_START_RPM = 3;       // Startgeschwindigkeit X-Achse während Türöffnen
 }
@@ -29,15 +29,15 @@ namespace MotionX {
 namespace MotionZ {
     constexpr float    STEPS_PER_MM   = 25.0f;
     constexpr uint32_t STEPS_PER_REV  = 800;
-    constexpr uint16_t MAX_RPM        = 100;
+    constexpr uint16_t MAX_RPM        = 70;
     constexpr uint16_t START_RPM      = 15;
     constexpr uint16_t HOMING_RPM     = 25;
     constexpr uint32_t ACCEL_STEPS    = 5000;
     constexpr uint32_t STEP_US        = 3;
     constexpr uint32_t DIR_US         = 5;
     constexpr bool     HOMING_FORWARD = false;
-    constexpr float    MAX_TRAVEL_MM   = 1400.0f;   // maximale Z-Verfahrlänge
-    constexpr float    SCAN_Z_PROBE_MM = 1350.0f;   // Z-Position der zweiten TF-Luna-Messung beim Scan
+    constexpr float    MAX_TRAVEL_MM   = 1500.0f;   // maximale Z-Verfahrlänge
+    constexpr float    SCAN_Z_PROBE_MM = 1400.0f;   // Z-Position der zweiten TF-Luna-Messung beim Scan
 }
 
 // ─── DRV8825 Greifer ──────────────────────────────────────────────────────────

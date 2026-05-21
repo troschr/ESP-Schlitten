@@ -12,6 +12,7 @@ void SensorManager::begin() {
     pinMode(_pinGripperHome, INPUT);
     pinMode(_pinDoorArmHome, INPUT);
     pinMode(_pinPlateSensor, INPUT);
+    Wire.setClock(400000);  // Fast mode: ~200µs/Transaktion statt ~700µs
     // VL53L0X init
     _vl53.setTimeout(500);
     if (_vl53.init()) {
