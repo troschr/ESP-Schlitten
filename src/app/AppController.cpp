@@ -6,15 +6,15 @@ AppController::AppController()
     : axisX_(Pins::X_STEP, Pins::X_DIR, Pins::X_EN,
              Config::MotionX::STEPS_PER_MM, Config::MotionX::STEPS_PER_REV,
              Config::MotionX::MAX_RPM, Config::MotionX::START_RPM, Config::MotionX::ACCEL_STEPS,
-             Config::MotionX::STEP_US, Config::MotionX::DIR_US)
+             Config::MotionX::STEP_US, Config::MotionX::DIR_US, 0)  // Timer 0
     , axisZ_(Pins::Z_STEP, Pins::Z_DIR, Pins::Z_EN,
              Config::MotionZ::STEPS_PER_MM, Config::MotionZ::STEPS_PER_REV,
              Config::MotionZ::MAX_RPM, Config::MotionZ::START_RPM, Config::MotionZ::ACCEL_STEPS,
-             Config::MotionZ::STEP_US, Config::MotionZ::DIR_US)
+             Config::MotionZ::STEP_US, Config::MotionZ::DIR_US, 1)  // Timer 1
     , gripper_(Pins::GRIPPER_STEP, Pins::GRIPPER_DIR, Pins::GRIPPER_EN,
-               Config::Gripper::STEP_US, Config::Gripper::DIR_US, Config::Gripper::STEP_DELAY_US)
+               Config::Gripper::STEP_US, Config::Gripper::DIR_US, Config::Gripper::STEP_DELAY_US, 2)  // Timer 2
     , doorArm_(Pins::DOOR_STEP, Pins::DOOR_DIR, Pins::DOOR_EN,
-               Config::DoorArm::STEP_US, Config::DoorArm::DIR_US, Config::DoorArm::STEP_DELAY_US)
+               Config::DoorArm::STEP_US, Config::DoorArm::DIR_US, Config::DoorArm::STEP_DELAY_US, 3)  // Timer 3
 {}
 
 bool AppController::posInRange(float xMm, float zMm) {

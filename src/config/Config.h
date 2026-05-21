@@ -29,8 +29,8 @@ namespace MotionX {
 namespace MotionZ {
     constexpr float    STEPS_PER_MM   = 25.0f;
     constexpr uint32_t STEPS_PER_REV  = 800;
-    constexpr uint16_t MAX_RPM        = 70;
-    constexpr uint16_t START_RPM      = 15;
+    constexpr uint16_t MAX_RPM        = 100;
+    constexpr uint16_t START_RPM      = 25;
     constexpr uint16_t HOMING_RPM     = 25;
     constexpr uint32_t ACCEL_STEPS    = 5000;
     constexpr uint32_t STEP_US        = 3;
