@@ -37,7 +37,7 @@ namespace MotionZ {
     constexpr uint32_t DIR_US         = 5;
     constexpr bool     HOMING_FORWARD = false;
     constexpr float    MAX_TRAVEL_MM   = 1500.0f;   // maximale Z-Verfahrlänge
-    constexpr float    SCAN_Z_PROBE_MM = 1400.0f;   // Z-Position der zweiten TF-Luna-Messung beim Scan
+    constexpr float    SCAN_Z_PROBE_MM = 1490.0f;   // Z-Position der zweiten TF-Luna-Messung beim Scan
 }
 
 // ─── DRV8825 Greifer ──────────────────────────────────────────────────────────
@@ -78,7 +78,7 @@ namespace Sensor {
     constexpr uint16_t DOOR_ENTRY_CLEARANCE_MM = 300; // Mindestwert für sicheres Einfahren des Greifers
     constexpr uint16_t OBSTACLE_STOP_MM      = 60;   // TF-Luna: Stopp-Abstand (Normalbetrieb)
     constexpr uint16_t OBSTACLE_WARN_MM      = 120;  // TF-Luna: Warnabstand
-    constexpr uint16_t SCAN_OBSTACLE_STOP_MM = 1000; // TF-Luna: Stopp-Abstand während Scanfahrt
+    constexpr uint16_t SCAN_OBSTACLE_STOP_MM = 4000; // TF-Luna: Stopp-Abstand während Scanfahrt
     constexpr uint16_t TFLUNA_AMP_MIN        = 100;  // Mindestsignalstärke TF-Luna
     constexpr uint8_t  TFLUNA_ADDR           = 0x10;
     constexpr uint8_t  MAX_OBSTACLE_FAULTS   = 3;    // aufeinanderfolgende I2C-Fehler bis Notstopp
